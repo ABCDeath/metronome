@@ -22,7 +22,7 @@ class MetronomeProcessor extends AudioWorkletProcessor {
 
     // Instantiate WASM from the compiled module — no fetch, no TextEncoder needed (D-08).
     // sampleRate is a read-only global in AudioWorkletGlobalScope (MDN: AudioWorkletGlobalScope).
-    WebAssembly.instantiate(wasmModule, {}).then(({ instance }) => {
+    WebAssembly.instantiate(wasmModule, {}).then((instance) => {
       this._exports = instance.exports;
 
       // Pass the AudioContext sample rate to WASM for Phase 2 DSP use.
