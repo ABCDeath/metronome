@@ -148,7 +148,7 @@ export class AudioEngine {
       //   bits  0–6:  sampleOffset (0–127)
       //   bits  7–11: voice = 0 (normal; accent reserved for Phase 3)
       //   bits 12–31: quantumIndex (Strategy A — robust for Phase 3+ extensions)
-      const event = (sampleOffset & 0x7F) | (quantumIndex << 12);
+      const event = (sampleOffset & 0x7F) | ((quantumIndex & 0xFFFFF) << 12); // mask to 20 bits before shift (CR-02)
 
       // Write to SPSC ring — producer side (D-06: Atomics.store on write index)
       const writeIdx  = Atomics.load(this._controlRingIndices, 1);

@@ -58,7 +58,10 @@ class MetronomeProcessor extends AudioWorkletProcessor {
   // MUST return true to keep the processor alive.
   // ZERO allocations: no new, no object literals, no string operations (D-11, T-01-03).
   process(_inputs, outputs) {
-    if (!this._ready) {
+    // Guard: _ringIndices arrives via "init-buffers" message, which is async from _ready.
+    // Both must be set before Atomics.load — a missing _ringIndices would throw TypeError
+    // and kill the processor permanently (CR-01).
+    if (!this._ready || !this._ringIndices) {
       return true;
     }
 
@@ -73,7 +76,7 @@ class MetronomeProcessor extends AudioWorkletProcessor {
       const event = this._ringData[readIdx];           // Uint32Array read — no allocation
       const evOffset  =  event & 0x7F;                // bits 0–6: sample offset (0–127)
       const evVoice   = (event >> 7) & 0x1F;          // bits 7–11: voice type
-      const evQuantum = (event >> 12) | 0;            // bits 12–31: quantum index
+      const evQuantum = (event >>> 12) & 0xFFFFF;     // bits 12–31: quantum index (unsigned shift, CR-02)
       const myQuantum = (currentFrame / 128) | 0;     // (x | 0) = integer truncation, no alloc
 
       if (evQuantum === myQuantum) {
