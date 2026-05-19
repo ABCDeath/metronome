@@ -31,7 +31,11 @@ Decimal phases appear between their surrounding integers in numeric order.
   3. A minimal Rust WASM module (writes silence) is compiled via `cargo + wasm-bindgen-cli + wasm-opt`, compiled on the main thread, transferred to the AudioWorklet via `processorOptions`, and instantiated inside the worklet without error; `process()` returns `true` each frame.
   4. Clicking "Play" before any user gesture does nothing; clicking the Play button (a genuine user gesture) resumes the AudioContext and the engine enters `"running"` state.
   5. No allocations occur inside `process()` — all Float32Array views and ring-buffer storage are pre-allocated at init time; confirmed by Chrome DevTools Memory timeline showing a flat heap during playback.
-**Plans:** TBD
+**Plans:** 2 plans
+
+Plans:
+- [ ] 01-01-PLAN.md — Scaffold Cargo workspace, Rust WASM crate, xtask build, Svelte 5 + Vite app with COOP/COEP headers
+- [ ] 01-02-PLAN.md — Wire AudioWorklet processor, SharedArrayBuffer ring/param buffers, gesture-gated Play button
 
 ### Phase 2: First Click
 **Goal:** The user can press Play and hear an audible, drift-free click at a fixed tempo; pressing Stop silences it. The minimum demonstrable value of the app exists.
@@ -91,7 +95,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Infrastructure | 0/TBD | Not started | - |
+| 1. Infrastructure | 0/2 | Planning complete | - |
 | 2. First Click | 0/TBD | Not started | - |
 | 3. Timing Controls | 0/TBD | Not started | - |
 | 4. Per-Beat Patterns and White Noise | 0/TBD | Not started | - |
