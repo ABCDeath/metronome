@@ -14,7 +14,7 @@ Five phases, each delivering something the user can run and hear. Phase 1 establ
 Decimal phases appear between their surrounding integers in numeric order.
 
 - [ ] **Phase 1: Infrastructure** - WASM build pipeline, AudioWorklet skeleton, SharedArrayBuffer ring, COOP/COEP headers, gesture gate — no sound yet but the entire audio stack is wired
-- [ ] **Phase 2: First Click** - Rust click synthesis + lookahead scheduler running end-to-end; user can press play and hear a click at a fixed tempo
+- [x] **Phase 2: First Click** - Rust click synthesis + lookahead scheduler running end-to-end; user can press play and hear a click at a fixed tempo (completed 2026-05-19)
 - [ ] **Phase 3: Timing Controls** - BPM, time signature, and subdivision controls connected to PatternState; beat 1 accent; user hears the correct pattern
 - [ ] **Phase 4: Per-Beat Patterns and White Noise** - Per-beat sound assignment UI; white noise mix slider; user can customize every beat position
 - [ ] **Phase 5: Cross-Platform Validation** - Android Chrome hardware testing, macOS Safari verification, timing budget audit; v1 ships
@@ -55,7 +55,7 @@ Plans:
   3. The lookahead scheduler (25ms `setTimeout` interval, 100ms lookahead window) writes beat events to the SPSC ring; the AudioWorklet reads them each `process()` frame and triggers WASM synthesis — verified by confirming `AudioContext.currentTime` clock anchoring with no drift over 60 seconds.
   4. The app opens and produces audio in both macOS Chrome and macOS Safari (PLATFORM-01 validated).
 
-**Plans:** 1/2 plans executed
+**Plans:** 2/2 plans complete
 
 Plans:
 **Wave 1**
@@ -64,7 +64,7 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 02-02-PLAN.md — Wire lookahead scheduler + worklet ring read + human verify audible click at 120 BPM
+- [x] 02-02-PLAN.md — Wire lookahead scheduler + worklet ring read + human verify audible click at 120 BPM
 
 ### Phase 3: Timing Controls
 
@@ -122,7 +122,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Infrastructure | 2/2 | Complete | 2026-05-19 |
-| 2. First Click | 1/2 | In Progress|  |
+| 2. First Click | 2/2 | Complete   | 2026-05-19 |
 | 3. Timing Controls | 0/TBD | Not started | - |
 | 4. Per-Beat Patterns and White Noise | 0/TBD | Not started | - |
 | 5. Cross-Platform Validation | 0/TBD | Not started | - |

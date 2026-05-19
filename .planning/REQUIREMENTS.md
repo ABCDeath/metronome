@@ -7,7 +7,7 @@
 - [ ] **TIMING-01**: User can set BPM in the range 20–300
 - [ ] **TIMING-02**: User can set time signature with a numerator and common denominators (e.g. 4/4, 3/4, 7/8, 5/4, 6/8)
 - [ ] **TIMING-03**: User can select subdivision (quarter notes, 8th notes, triplets, 16th notes)
-- [ ] **TIMING-04**: User can start and stop the metronome via a play/stop control
+- [x] **TIMING-04**: User can start and stop the metronome via a play/stop control
 
 ### Pattern
 
@@ -23,7 +23,7 @@
 
 ### Platform
 
-- [ ] **PLATFORM-01**: App runs in browser on macOS (Chrome and Safari)
+- [x] **PLATFORM-01**: App runs in browser on macOS (Chrome and Safari)
 - [ ] **PLATFORM-02**: App runs in browser on Android Chrome
 - [ ] **PLATFORM-03**: AudioContext is activated only after a user gesture (browser autoplay policy compliance)
 - [ ] **PLATFORM-04**: Server/dev server serves COOP and COEP headers (required for SharedArrayBuffer access)
