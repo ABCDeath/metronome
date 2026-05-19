@@ -27,7 +27,7 @@ decisions:
 metrics:
   duration: "~20 min"
   completed: "2026-05-19"
-  tasks_completed: 1
+  tasks_completed: 2
   files_modified: 2
 ---
 
@@ -83,7 +83,14 @@ Added 4 private fields:
 ```
 npm run typecheck: exit 0 (tsc --noEmit passes)
 cargo xtask build: exit 0 (WASM compiled with 3-arg fill_output_buffer signature)
-Manual browser verification: PENDING (Task 2 checkpoint)
+Manual browser verification (macOS Chrome): APPROVED by user
+- Audible click at ~120 BPM (2 clicks/second, percussive woodblock character)
+- 60-second sustained test: evenly spaced, no audible drift, no gaps, no double-clicks
+- Stop: audio silences immediately
+- Play/Stop/Play cycle: resumes correctly, no stale event burst on restart
+- Console: "[AudioEngine] AudioWorklet ready", no errors
+- crossOriginIsolated === true confirmed in Chrome DevTools
+- Chrome Performance tab: no GC spikes aligned with audio callbacks (zero allocations confirmed)
 ```
 
 ## Deviations from Plan
@@ -104,9 +111,7 @@ None. The scheduler is fully wired: Play → scheduler → ring → worklet → 
 
 No new threat surface beyond the plan's threat model. All T-02-03 through T-02-06 mitigations implemented as specified.
 
-## Self-Check: PENDING
-
-Task 2 (human-verify checkpoint) not yet executed — browser verification in macOS Chrome is the remaining gate.
+## Self-Check: PASSED
 
 - [x] `src/lib/audio-engine.ts` modified — contains `_schedulerIntervalId`, `_nextBeatTime`, `_controlRingIndices`, `_controlRingData`
 - [x] `_schedulerTick()` method present with `while (this._nextBeatTime`
@@ -121,3 +126,4 @@ Task 2 (human-verify checkpoint) not yet executed — browser verification in ma
 - [x] `npm run typecheck` exits 0
 - [x] `cargo xtask build` exits 0
 - [x] Commit 5a955b8 exists in git log
+- [x] User approved macOS Chrome browser verification (Task 2 checkpoint)

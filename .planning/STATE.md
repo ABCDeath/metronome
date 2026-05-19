@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: verifying
-stopped_at: Phase 2 context gathered
-last_updated: "2026-05-19T13:46:07.326Z"
+stopped_at: Phase 2 complete — audible 120 BPM click verified in macOS Chrome
+last_updated: "2026-05-19T18:13:49.450Z"
 last_activity: 2026-05-19
 progress:
   total_phases: 5
@@ -21,13 +21,13 @@ progress:
 See: .planning/PROJECT.md (updated 2026-05-18)
 
 **Core value:** Clicks that land on time, every time — the audio engine must be low-latency and drift-free, or the app is useless.
-**Current focus:** Phase 02 — first-click
+**Current focus:** Phase 03 — timing-controls (next)
 
 ## Current Position
 
-Phase: 02 (first-click) — EXECUTING
-Plan: 2 of 2
-Status: Phase complete — ready for verification
+Phase: 02 (first-click) — COMPLETE
+Plan: 2 of 2 — all plans done
+Status: Phase 2 complete; Phase 3 is next
 Last activity: 2026-05-19
 
 Progress: [██████████] 100%
@@ -52,7 +52,7 @@ Progress: [██████████] 100%
 - Trend: Baseline established; Phase 1 complete
 
 *Updated after each plan completion*
-| Phase 02-first-click P02 | 20 | 1 tasks | 2 files |
+| Phase 02-first-click P02 | 20 | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -71,6 +71,9 @@ Recent decisions affecting current work:
 - 01-02: WASM passed to AudioWorklet via processorOptions.wasmModule (ArrayBuffer) — worklet scope has no fetch/TextEncoder; this is the only viable transfer path
 - 01-02: SharedArrayBuffer SPSC ring for beat scheduling; Atomics parameter buffer for is_playing + noise gain — zero-copy, no postMessage on audio thread
 - 01-02: WebAssembly.instantiate(module, {}) returns Instance directly (not { module, instance }) — destructuring bug caught and fixed post-checkpoint
+- 02-02: nextBeatTime seeded to audioCtx.currentTime on start() (not 0) — prevents ring flood on first scheduler tick (RESEARCH Pitfall 2, T-02-06)
+- 02-02: clearInterval + Atomics.store ring reset in stop() before suspend() — prevents stale event burst on Play/Stop/Play cycle (T-02-04)
+- 02-02: PLATFORM-01 partially satisfied — macOS Chrome verified by user; macOS Safari deferred to Phase 5 per D-09
 
 ### Pending Todos
 
@@ -94,7 +97,7 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-05-19T13:45:57.228Z
-Stopped at: Phase 2 context gathered
+Last session: 2026-05-19T18:13:49.443Z
+Stopped at: Phase 2 complete — audible 120 BPM click verified in macOS Chrome
 Resume file: None
-Next: Phase 2 — Audio Engine (DSP implementation, click synthesis, beat scheduling)
+Next: Phase 3 — Timing Controls (BPM, time signature, subdivision controls connected to PatternState)
