@@ -62,9 +62,34 @@ class MetronomeProcessor extends AudioWorkletProcessor {
       return true;
     }
 
-    // Phase 1: fill with silence — no beat scheduling yet.
-    // beat_flags=0, noise_gain=0.0
-    this._exports.fill_output_buffer(0, 0.0);
+    // Read ring indices — Atomics.load, no allocation (D-06)
+    const readIdx  = Atomics.load(this._ringIndices, 0);  // slot 0 = read index
+    const writeIdx = Atomics.load(this._ringIndices, 1);  // slot 1 = write index
+
+    let sampleOffset = 0xFF; // NO_BEAT_SENTINEL — default: no beat this quantum
+    let voice = 0;
+
+    if (readIdx !== writeIdx) {
+      const event = this._ringData[readIdx];           // Uint32Array read — no allocation
+      const evOffset  =  event & 0x7F;                // bits 0–6: sample offset (0–127)
+      const evVoice   = (event >> 7) & 0x1F;          // bits 7–11: voice type
+      const evQuantum = (event >> 12) | 0;            // bits 12–31: quantum index
+      const myQuantum = (currentFrame / 128) | 0;     // (x | 0) = integer truncation, no alloc
+
+      if (evQuantum === myQuantum) {
+        // Event fires in the current quantum — consume it
+        sampleOffset = evOffset;
+        voice = evVoice;
+        Atomics.store(this._ringIndices, 0, (readIdx + 1) & 0xFF);  // advance read index
+      } else if (evQuantum < myQuantum) {
+        // Stale event — drain it (prevents ring from blocking on missed quanta)
+        Atomics.store(this._ringIndices, 0, (readIdx + 1) & 0xFF);
+      }
+      // evQuantum > myQuantum: leave in ring for a future quantum (do nothing)
+    }
+
+    // Call fill_output_buffer with 3 args per D-05 (updated from Phase 1 2-arg stub).
+    this._exports.fill_output_buffer(sampleOffset, voice, 0.0);
 
     // Copy 128 f32 samples from WASM linear memory to the output buffer.
     // outputs[0][0] is the mono output channel Float32Array.
