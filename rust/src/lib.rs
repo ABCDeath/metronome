@@ -1,10 +1,20 @@
-// Phase 1: Silence-only WASM module.
+// Phase 2: Click DSP synthesis — triangle wave + exponential decay envelope.
 // No heap allocations — static buffers only (D-11).
 // Exports use #[no_mangle] pub extern "C" fn only (D-08).
 // wasm-bindgen crate is NOT a dependency — pure C ABI exports, no JS glue needed.
 
 static mut AUDIO_OUT: [f32; 128] = [0.0; 128];
 static mut SAMPLE_RATE: f32 = 44100.0;
+static mut PHASE_ACCUM: f32 = 0.0;      // triangle wave phase in [0.0, 1.0)
+static mut PHASE_INC: f32 = 0.0;        // set in init() = CLICK_FREQ / SAMPLE_RATE
+static mut ENVELOPE_GAIN: f32 = 0.0;    // current envelope amplitude
+static mut DECAY_COEFF: f32 = 0.0;      // set in init() = exp(-1 / decay_samples)
+static mut ACTIVE: bool = false;         // is the click envelope currently running?
+
+const CLICK_FREQ: f32 = 1000.0;         // D-01: 1000 Hz warm click
+const DECAY_MS: f32 = 12.0;             // D-02: 12ms (midpoint of 10–15ms range)
+const SILENCE_THRESHOLD: f32 = 1.0e-4;  // stop rendering when envelope falls below this
+const NO_BEAT_SENTINEL: u32 = 0xFF;     // sample_offset value meaning "no beat this quantum"
 
 /// Returns a pointer to the static output buffer.
 /// The AudioWorklet creates a Float32Array view over this pointer once at init.
@@ -15,29 +25,78 @@ pub extern "C" fn get_output_buffer_ptr() -> *const f32 {
     std::ptr::addr_of!(AUDIO_OUT) as *const f32
 }
 
-/// Called every AudioWorklet process() callback.
-/// Fills AUDIO_OUT with silence (Phase 1 — DSP added in Phase 2).
-/// beat_flags: bitmask of voices to trigger (unused in Phase 1)
-/// noise_gain: float 0.0–1.0 (unused in Phase 1)
+/// Triangle wave sample function.
+/// phase in [0.0, 1.0) → output in [-1.0, 1.0].
+/// Odd harmonics at 1/n² amplitudes — mechanical woodblock character (D-03).
+#[inline(always)]
+fn triangle_sample(phase: f32) -> f32 {
+    (phase - 0.5).abs() * 4.0 - 1.0
+}
+
+/// Called every AudioWorklet process() callback (128 samples per call).
+/// sample_offset: sample within this quantum where the click starts (0–127),
+///                or NO_BEAT_SENTINEL (0xFF) if no beat fires this quantum.
+/// _voice:        voice type (0=normal; reserved for Phase 3 accent/ghost).
+/// _noise_gain:   white noise mix level (unused until Phase 3).
 #[no_mangle]
-pub extern "C" fn fill_output_buffer(_beat_flags: u32, _noise_gain: f32) {
-    // Phase 1: silence. No allocation, no branching.
+pub extern "C" fn fill_output_buffer(sample_offset: u32, _voice: u32, _noise_gain: f32) {
     // SAFETY: Single-threaded WASM; no concurrent mutation possible.
     unsafe {
         let ptr = std::ptr::addr_of_mut!(AUDIO_OUT) as *mut f32;
+
+        // Trigger: arm envelope if a beat fires this quantum (T-02-01: sentinel guards OOB).
+        if sample_offset != NO_BEAT_SENTINEL {
+            std::ptr::addr_of_mut!(ENVELOPE_GAIN).write(1.0_f32);
+            std::ptr::addr_of_mut!(PHASE_ACCUM).write(0.0_f32);
+            std::ptr::addr_of_mut!(ACTIVE).write(true);
+        }
+
         for i in 0..128_usize {
-            ptr.add(i).write(0.0_f32);
+            let sample = if std::ptr::addr_of!(ACTIVE).read()
+                && (sample_offset == NO_BEAT_SENTINEL || i >= sample_offset as usize)
+            {
+                let phase = std::ptr::addr_of!(PHASE_ACCUM).read();
+                let gain = std::ptr::addr_of!(ENVELOPE_GAIN).read();
+
+                // Triangle wave synthesis
+                let s = triangle_sample(phase);
+                let output = s * gain;
+
+                // Advance phase — subtraction avoids float division (RESEARCH.md anti-pattern)
+                let mut new_phase = phase + std::ptr::addr_of!(PHASE_INC).read();
+                if new_phase >= 1.0 {
+                    new_phase -= 1.0;
+                }
+                std::ptr::addr_of_mut!(PHASE_ACCUM).write(new_phase);
+
+                // Advance envelope — multiplicative decay persists across quanta (Pitfall 1)
+                let new_gain = gain * std::ptr::addr_of!(DECAY_COEFF).read();
+                std::ptr::addr_of_mut!(ENVELOPE_GAIN).write(new_gain);
+                if new_gain < SILENCE_THRESHOLD {
+                    std::ptr::addr_of_mut!(ACTIVE).write(false);
+                }
+
+                output
+            } else {
+                0.0_f32
+            };
+            ptr.add(i).write(sample);
         }
     }
 }
 
-/// Stores the AudioContext sample rate for Phase 2 DSP use.
+/// Stores the AudioContext sample rate and derives DSP constants.
 /// Called once from the AudioWorklet constructor.
 #[no_mangle]
 pub extern "C" fn init(sample_rate: f32) {
     // SAFETY: Single-threaded WASM; no concurrent mutation possible.
     unsafe {
         std::ptr::addr_of_mut!(SAMPLE_RATE).write(sample_rate);
+        let phase_inc = CLICK_FREQ / sample_rate;
+        std::ptr::addr_of_mut!(PHASE_INC).write(phase_inc);
+        let decay_samples = (DECAY_MS / 1000.0) * sample_rate;
+        let decay_coeff = (-1.0_f32 / decay_samples).exp();
+        std::ptr::addr_of_mut!(DECAY_COEFF).write(decay_coeff);
     }
 }
 
@@ -54,25 +113,8 @@ mod tests {
 
     #[test]
     fn triangle_wave_at_phase_0() {
-        // phase=0.0 → (0.0 - 0.5).abs() * 4.0 - 1.0 = 0.5 * 4.0 - 1.0 = 1.0
-        // Wait — let's verify: (0.0 - 0.5).abs() = 0.5; 0.5 * 4.0 = 2.0; 2.0 - 1.0 = 1.0
-        // But RESEARCH says phase=0.0 → -1.0. Let's check the formula carefully:
-        // The formula (phase - 0.5).abs() * 4.0 - 1.0:
-        //   phase=0.0:  (0.0 - 0.5).abs() = 0.5; 0.5*4 - 1 = 1.0  ← NOT -1.0
-        // The PLAN says phase=0.0 → -1.0. Use alternative: abs(phase*2 - 1)*2 - 1:
-        //   phase=0.0: abs(0 - 1)*2 - 1 = 1*2 - 1 = 1.0  ← still 1.0
-        // Actually: 2.0*((phase - 0.5).abs()*2.0) - 1.0 — let's just test with
-        // the RESEARCH formula and the PLAN's boundary values:
-        // RESEARCH formula: (phase - 0.5).abs() * 4.0 - 1.0
-        //   phase=0.0  → 0.5*4-1 = 1.0
-        //   phase=0.25 → 0.25*4-1 = 0.0
-        //   phase=0.5  → 0.0*4-1 = -1.0
-        //   phase=0.75 → 0.25*4-1 = 0.0
-        // PLAN says phase=0.0→-1.0, but RESEARCH formula gives 1.0.
-        // The PLAN boundary values appear inverted relative to the formula.
-        // Use RESEARCH formula (authoritative) and test actual formula values:
+        // phase=0.0: (0.0 - 0.5).abs() * 4.0 - 1.0 = 0.5*4 - 1 = 1.0
         let s = (0.0_f32 - 0.5).abs() * 4.0 - 1.0;
-        // phase=0.0 gives 1.0 with this formula
         assert!((s - 1.0).abs() < 1e-6, "phase=0.0 expected 1.0, got {}", s);
     }
 
@@ -113,7 +155,7 @@ mod tests {
     fn decay_coefficient_correctness() {
         // At 44100Hz with DECAY_MS=12ms: decay_samples = 529.2
         // After decay_samples iterations, gain ≈ e^(-1) ≈ 0.368
-        unsafe { init(44100.0); }
+        init(44100.0);
         let decay_samples = (12.0_f32 / 1000.0) * 44100.0; // 529.2
         let coeff = unsafe { std::ptr::addr_of!(DECAY_COEFF).read() };
         let mut gain = 1.0_f32;
@@ -127,7 +169,7 @@ mod tests {
     fn decay_coefficient_48k() {
         // At 48000Hz with DECAY_MS=12ms: decay_samples = 576.0
         // After 576 iterations, gain ≈ e^(-1) ≈ 0.368
-        unsafe { init(48000.0); }
+        init(48000.0);
         let decay_samples = (12.0_f32 / 1000.0) * 48000.0; // 576.0
         let coeff = unsafe { std::ptr::addr_of!(DECAY_COEFF).read() };
         let mut gain = 1.0_f32;
