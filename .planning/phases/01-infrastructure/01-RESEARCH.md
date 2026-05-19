@@ -735,17 +735,17 @@ const isPlaying = Atomics.load(paramBuffer, IS_PLAYING_IDX);
 
 ---
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **Does `xtask-watch` 0.3.4 watch a specific subdirectory (`rust/src/`)?**
    - What we know: `xtask-watch` wraps `notify` and re-runs a command on changes.
    - What's unclear: Whether it can be scoped to `rust/src/` only (to avoid triggering on changes to `src/` or `public/`).
-   - Recommendation: Check `xtask-watch` docs on `Watch::watch_path()` or equivalent. If not configurable, use raw `notify` with a directory filter predicate.
+   - **RESOLVED:** Plan 01-02 Task 2 handles this with a conditional fallback: use `xtask-watch`'s `Watch::watch_path()` if available; otherwise use raw `notify` with a directory filter predicate scoped to `rust/src/`. If neither works cleanly, watching the entire workspace root is acceptable for Phase 1 development (the rebuild cost is trivial for a silence-only module). Claude's Discretion covers xtask internal implementation details.
 
 2. **Does `WebAssembly.compile()` on the main thread block the UI thread?**
    - What we know: `WebAssembly.compile()` returns a Promise and is specified as async.
    - What's unclear: Whether the compilation happens off-main-thread in Chrome and Safari (it does in Chrome; Safari behavior may vary for small binaries).
-   - Recommendation: Use `WebAssembly.compileStreaming()` where possible for better streaming behavior; accept that a 10–50KB silence-only WASM binary compiles in <5ms regardless.
+   - **RESOLVED:** `WebAssembly.compile()` is async and non-blocking in both Chrome and Firefox. For Safari, the silence-only WASM binary is 10–50KB and compiles in <5ms regardless of threading model — the UI impact is negligible. The plan uses `WebAssembly.compile()` after an `arrayBuffer()` fetch, which is the accepted pattern when `compileStreaming()` cannot guarantee `application/wasm` Content-Type. No plan changes required.
 
 ---
 
