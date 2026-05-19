@@ -1,0 +1,14 @@
+[package]
+name = "metronome-engine"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib"]
+
+# wasm-bindgen intentionally excluded (D-08): the AudioWorklet hot path uses
+# #[no_mangle] pub extern "C" fn exports only — no wasm-bindgen macros.
+# The WASM binary is loaded via WebAssembly.compile() and exports called directly (D-07).
+# wasm-bindgen-cli is still installed for the build pipeline but not linked into the binary.
+
+# Profile defined in workspace root Cargo.toml
