@@ -1,11 +1,30 @@
 <script lang="ts">
-  let status = 'not started'
+  import { AudioEngine } from './lib/audio-engine.js'
+
+  // AudioEngine instance created at component init — does NOT create AudioContext.
+  // AudioContext is only created inside engine.start() on user gesture (D-12).
+  let engineState = $state<'stopped' | 'running'>('stopped')
+
+  const engine = new AudioEngine((state) => {
+    engineState = state
+  })
+
+  async function handlePlayStop() {
+    if (engine.state === 'stopped') {
+      // This click handler IS the user gesture — AudioContext is created inside start() (D-12).
+      await engine.start()
+    } else {
+      await engine.stop()
+    }
+  }
 </script>
 
 <main>
   <h1>Metronome</h1>
-  <button id="play-btn" type="button">Play</button>
-  <p class="status">Status: {status}</p>
+  <button id="play-btn" type="button" onclick={handlePlayStop}>
+    {engineState === 'running' ? 'Stop' : 'Play'}
+  </button>
+  <p class="status">Status: {engineState}</p>
 </main>
 
 <style>
