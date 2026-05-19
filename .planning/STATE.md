@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: "Plan 01-01 complete (2026-05-19)"
-last_updated: "2026-05-19T05:55:30Z"
-last_activity: 2026-05-19 -- Phase 1 Plan 01-01 Infrastructure Scaffold complete
+stopped_at: "Plan 01-02 complete (2026-05-19)"
+last_updated: "2026-05-19T09:00:00Z"
+last_activity: 2026-05-19 -- Phase 1 Plan 01-02 AudioWorklet + SAB pipeline complete
 progress:
   total_phases: 5
-  completed_phases: 0
+  completed_phases: 1
   total_plans: 2
-  completed_plans: 1
-  percent: 10
+  completed_plans: 2
+  percent: 20
 ---
 
 # Project State
@@ -25,12 +25,12 @@ See: .planning/PROJECT.md (updated 2026-05-18)
 
 ## Current Position
 
-Phase: 1 of 5 (Infrastructure)
-Plan: 1 of 2 complete in current phase (01-01 done; 01-02 next)
+Phase: 1 of 5 (Infrastructure) — COMPLETE
+Plan: 2 of 2 complete in current phase (01-01 done; 01-02 done)
 Status: Executing
-Last activity: 2026-05-19 -- Plan 01-01 complete: Cargo workspace + WASM pipeline + Svelte/Vite scaffold
+Last activity: 2026-05-19 -- Plan 01-02 complete: AudioWorklet processor + SAB pipeline + Walking Skeleton proven
 
-Progress: [█░░░░░░░░░] 10%
+Progress: [██░░░░░░░░] 20%
 
 ## Performance Metrics
 
@@ -44,12 +44,12 @@ Progress: [█░░░░░░░░░] 10%
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
-| 01-infrastructure | 1/2 | ~40 min | ~40 min |
+| 01-infrastructure | 2/2 | ~100 min | ~50 min |
 
 **Recent Trend:**
 
-- Last 5 plans: 01-01 (40 min)
-- Trend: Baseline established
+- Last 5 plans: 01-01 (40 min), 01-02 (~60 min)
+- Trend: Baseline established; Phase 1 complete
 
 *Updated after each plan completion*
 
@@ -67,6 +67,9 @@ Recent decisions affecting current work:
 - Roadmap: Android testing requires physical devices (minimum two OEM families) — emulators do not reproduce timing bugs
 - 01-01: wasm-bindgen-cli skipped in build pipeline — pure #[no_mangle] WASM has no wasm_bindgen markers; CLI fails with clone_ref intrinsics error; cargo output copied directly
 - 01-01: wasm-bindgen crate removed from rust/Cargo.toml — not needed for C ABI exports; phase 2 may re-add if main-thread TS types needed
+- 01-02: WASM passed to AudioWorklet via processorOptions.wasmModule (ArrayBuffer) — worklet scope has no fetch/TextEncoder; this is the only viable transfer path
+- 01-02: SharedArrayBuffer SPSC ring for beat scheduling; Atomics parameter buffer for is_playing + noise gain — zero-copy, no postMessage on audio thread
+- 01-02: WebAssembly.instantiate(module, {}) returns Instance directly (not { module, instance }) — destructuring bug caught and fixed post-checkpoint
 
 ### Pending Todos
 
@@ -90,7 +93,7 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-05-19T05:55:30Z
-Stopped at: Plan 01-01 complete (2026-05-19)
+Last session: 2026-05-19T09:00:00Z
+Stopped at: Plan 01-02 complete (2026-05-19) — Phase 1 Infrastructure fully complete
 Resume file: None
-Next: Execute 01-02-PLAN.md (AudioWorklet processor + main-thread bootstrap)
+Next: Phase 2 — Audio Engine (DSP implementation, click synthesis, beat scheduling)
