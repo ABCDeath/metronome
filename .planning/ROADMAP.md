@@ -34,7 +34,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 **Plans:** 2 plans
 
 Plans:
-- [ ] 01-01-PLAN.md — Scaffold Cargo workspace, Rust WASM crate, xtask build, Svelte 5 + Vite app with COOP/COEP headers
+- [x] 01-01-PLAN.md — Scaffold Cargo workspace, Rust WASM crate, xtask build, Svelte 5 + Vite app with COOP/COEP headers (COMPLETE 2026-05-19)
 - [ ] 01-02-PLAN.md — Wire AudioWorklet processor, SharedArrayBuffer ring/param buffers, gesture-gated Play button
 
 ### Phase 2: First Click
