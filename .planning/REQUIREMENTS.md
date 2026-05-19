@@ -53,21 +53,19 @@
 
 ## Traceability
 
-_Filled by roadmap agent after ROADMAP.md is created._
-
 | REQ-ID | Phase |
 |--------|-------|
-| TIMING-01 | — |
-| TIMING-02 | — |
-| TIMING-03 | — |
-| TIMING-04 | — |
-| PATTERN-01 | — |
-| PATTERN-02 | — |
-| AUDIO-01 | — |
-| AUDIO-02 | — |
-| AUDIO-03 | — |
-| AUDIO-04 | — |
-| PLATFORM-01 | — |
-| PLATFORM-02 | — |
-| PLATFORM-03 | — |
-| PLATFORM-04 | — |
+| TIMING-01 | Phase 3 |
+| TIMING-02 | Phase 3 |
+| TIMING-03 | Phase 3 |
+| TIMING-04 | Phase 2 |
+| PATTERN-01 | Phase 4 |
+| PATTERN-02 | Phase 3 |
+| AUDIO-01 | Phase 2 |
+| AUDIO-02 | Phase 4 |
+| AUDIO-03 | Phase 1 |
+| AUDIO-04 | Phase 1 |
+| PLATFORM-01 | Phase 2 |
+| PLATFORM-02 | Phase 5 |
+| PLATFORM-03 | Phase 1 |
+| PLATFORM-04 | Phase 1 |
