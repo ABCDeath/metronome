@@ -47,7 +47,11 @@ Plans:
   2. The click is synthesized by the Rust WASM engine (exponential-decay envelope, sample-rate-agnostic); no external audio files are required to hear a sound.
   3. The lookahead scheduler (25ms `setTimeout` interval, 100ms lookahead window) writes beat events to the SPSC ring; the AudioWorklet reads them each `process()` frame and triggers WASM synthesis — verified by confirming `AudioContext.currentTime` clock anchoring with no drift over 60 seconds.
   4. The app opens and produces audio in both macOS Chrome and macOS Safari (PLATFORM-01 validated).
-**Plans:** TBD
+**Plans:** 2 plans
+
+Plans:
+- [ ] 02-01-PLAN.md — TDD: Rust DSP click synthesis (triangle wave + exponential decay envelope) with unit tests
+- [ ] 02-02-PLAN.md — Wire lookahead scheduler + worklet ring read + human verify audible click at 120 BPM
 
 ### Phase 3: Timing Controls
 **Goal:** The user can set BPM, time signature, and subdivision, and hear the correct beat pattern immediately. Beat 1 defaults to an accent sound. The PatternState multi-track model is in place.
@@ -95,8 +99,8 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Infrastructure | 0/2 | Planning complete | - |
-| 2. First Click | 0/TBD | Not started | - |
+| 1. Infrastructure | 2/2 | Complete | 2026-05-19 |
+| 2. First Click | 0/2 | Planning complete | - |
 | 3. Timing Controls | 0/TBD | Not started | - |
 | 4. Per-Beat Patterns and White Noise | 0/TBD | Not started | - |
 | 5. Cross-Platform Validation | 0/TBD | Not started | - |
