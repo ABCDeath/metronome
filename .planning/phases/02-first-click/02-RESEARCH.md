@@ -605,17 +605,17 @@ process(_inputs, outputs) {
 
 ---
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **Does `AudioContext.suspend()` pause `currentFrame`, and does it resume from the same value?**
    - What we know: `currentTime` pauses on Chrome; `currentFrame` should behave the same (both are derived from the audio hardware clock).
    - What's unclear: Spec does not explicitly state `currentFrame` behavior on suspend/resume.
-   - Recommendation: Test empirically during Phase 2 manual validation. If `currentFrame` resets to 0 on resume, stale ring events must be purged on `stop()`.
+   - **RESOLVED: Verify empirically in Plan 02-02 Task 2 human-verify checkpoint.** If `currentFrame` resets to 0 on resume, stale ring events must be purged on `stop()`.
 
 2. **Should the sentinel be `0xFF` (255) or a dedicated `has_beat` parameter in `fill_output_buffer`?**
    - What we know: D-05 locks the 3-argument signature; sentinel approach preserves it.
    - What's unclear: Nothing — sentinel is unambiguous given bits 0–6 range (0–127).
-   - Recommendation: Use `0xFF` sentinel (Claude's Discretion). Document it as a constant in both `lib.rs` and `processor.js`.
+   - **RESOLVED: Use `0xFF` sentinel (Claude's Discretion). Document it as a constant in both `lib.rs` and `processor.js`.**
 
 ---
 
