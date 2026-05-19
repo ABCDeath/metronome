@@ -16,7 +16,7 @@
 
 ### Audio
 
-- [ ] **AUDIO-01**: Default click sounds are synthesized by the Rust WASM engine (no external audio files required)
+- [x] **AUDIO-01**: Default click sounds are synthesized by the Rust WASM engine (no external audio files required)
 - [ ] **AUDIO-02**: User can mix white noise into the output with a controllable mix level (0–100%)
 - [ ] **AUDIO-03**: Audio engine achieves scheduling gaps of no more than 10ms between clicks at any BPM
 - [ ] **AUDIO-04**: Clicks are consistent in length and amplitude across all tempos and subdivisions

@@ -55,12 +55,12 @@ Plans:
   3. The lookahead scheduler (25ms `setTimeout` interval, 100ms lookahead window) writes beat events to the SPSC ring; the AudioWorklet reads them each `process()` frame and triggers WASM synthesis — verified by confirming `AudioContext.currentTime` clock anchoring with no drift over 60 seconds.
   4. The app opens and produces audio in both macOS Chrome and macOS Safari (PLATFORM-01 validated).
 
-**Plans:** 2 plans
+**Plans:** 1/2 plans executed
 
 Plans:
 **Wave 1**
 
-- [ ] 02-01-PLAN.md — TDD: Rust DSP click synthesis (triangle wave + exponential decay envelope) with unit tests
+- [x] 02-01-PLAN.md — TDD: Rust DSP click synthesis (triangle wave + exponential decay envelope) with unit tests
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
@@ -122,7 +122,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Infrastructure | 2/2 | Complete | 2026-05-19 |
-| 2. First Click | 0/2 | Planning complete | - |
+| 2. First Click | 1/2 | In Progress|  |
 | 3. Timing Controls | 0/TBD | Not started | - |
 | 4. Per-Beat Patterns and White Noise | 0/TBD | Not started | - |
 | 5. Cross-Platform Validation | 0/TBD | Not started | - |
