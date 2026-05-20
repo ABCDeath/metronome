@@ -3,6 +3,9 @@
 // D-12: AudioContext created ONLY on Play button click (user gesture). NEVER at import time.
 // D-11: SharedArrayBuffers pre-allocated once; zero allocations in the audio hot path.
 
+import type { PatternState, BeatPosition, Subdivision } from './pattern.js';
+import { SUBDIV_MULT } from './pattern.js';
+
 type AudioEngineState = 'stopped' | 'running';
 
 export class AudioEngine {
@@ -16,6 +19,11 @@ export class AudioEngine {
   private _nextBeatTime: number = 0;
   private _controlRingIndices: Int32Array | null = null;
   private _controlRingData: Uint32Array | null = null;
+  private _paramBuffer: Int32Array | null = null;          // Int32Array view over _paramSAB
+  private _stepInterval: number = 60.0 / 120;             // seconds per step (recomputed by updatePattern)
+  private _beats: BeatPosition[] = [{ voice: 1 }, { voice: 0 }, { voice: 0 }, { voice: 0 }];
+  private _stepCount: number = 4;
+  private _barStep: number = 0;
 
   constructor(onStateChange?: (state: AudioEngineState) => void) {
     // AudioContext is NOT created here — only in start() via user gesture (D-12).
@@ -65,6 +73,7 @@ export class AudioEngine {
       // Matches the layout the worklet creates: indices at bytes 0-7, data at bytes 8-1031.
       this._controlRingIndices = new Int32Array(this._controlRingSAB, 0, 2);
       this._controlRingData = new Uint32Array(this._controlRingSAB, 8, 256);
+      this._paramBuffer = new Int32Array(this._paramSAB, 0, 8);
 
       // Pass the compiled WebAssembly.Module via processorOptions (D-07).
       // WebAssembly.Module is serializable via structured clone — no postMessage needed.
@@ -124,6 +133,8 @@ export class AudioEngine {
       Atomics.store(this._controlRingIndices, 0, 0); // reset read index
       Atomics.store(this._controlRingIndices, 1, 0); // reset write index
     }
+    // Reset bar position so playback restarts from beat 0 (D-09)
+    this._barStep = 0;
 
     if (this._audioCtx) {
       await this._audioCtx.suspend();
@@ -131,6 +142,43 @@ export class AudioEngine {
 
     this._state = 'stopped';
     this._onStateChange?.(this._state);
+  }
+
+  /**
+   * Update the audio engine with new pattern state.
+   * Computes step interval (D-08), updates beat array, writes accent params to paramSAB.
+   * Safe to call before start() — paramSAB writes are guarded (Pitfall P3-04).
+   * Do NOT modify _nextBeatTime here (Pitfall P3-01: never reset nextBeatTime in updatePattern).
+   */
+  updatePattern(state: PatternState): void {
+    const track = state.tracks[0];
+    const mult = SUBDIV_MULT[track.subdivision as Subdivision] ?? 1;
+    const newInterval = (60.0 / state.bpm) * (4 / track.denominator) / mult;
+    const newStepCount = track.stepCount;
+
+    // Reset bar position when step count changes (Pitfall P3-02: stale barStep OOB)
+    if (newStepCount !== this._stepCount) {
+      this._barStep = 0;
+    }
+
+    this._stepInterval = newInterval;
+    this._stepCount    = newStepCount;
+    this._beats        = track.beats;
+
+    // Write accent params to paramSAB — guarded for pre-start() calls (Pitfall P3-04)
+    if (this._paramBuffer) {
+      Atomics.store(this._paramBuffer, 2, state.accentFreqHz);
+      Atomics.store(this._paramBuffer, 3, state.accentAmpMillis);
+    }
+
+    // Notify worklet to update accent params immediately (Research Open Question 1, Option A)
+    if (this._workletNode) {
+      this._workletNode.port.postMessage({
+        type: 'update-accent',
+        freqHz: state.accentFreqHz,
+        amp: state.accentAmpMillis / 1000.0,
+      });
+    }
   }
 
   private _schedulerTick(): void {
@@ -144,11 +192,15 @@ export class AudioEngine {
       const quantumIndex  = Math.floor(beatSampleAbs / 128);
       const sampleOffset  = Math.min(Math.round(beatSampleAbs % 128), 127); // clamp to 0–127
 
+      // Compute step index and voice for this beat (D-09)
+      const stepIndex = this._barStep % this._stepCount;
+      const voice     = this._beats[stepIndex]?.voice ?? 0;
+
       // Pack u32 event (D-04):
       //   bits  0–6:  sampleOffset (0–127)
-      //   bits  7–11: voice = 0 (normal; accent reserved for Phase 3)
+      //   bits  7–11: voice (0=normal, 1=accent)
       //   bits 12–31: quantumIndex (Strategy A — robust for Phase 3+ extensions)
-      const event = (sampleOffset & 0x7F) | ((quantumIndex & 0xFFFFF) << 12); // mask to 20 bits before shift (CR-02)
+      const event = (sampleOffset & 0x7F) | ((voice & 0x1F) << 7) | ((quantumIndex & 0xFFFFF) << 12); // mask to 20 bits before shift (CR-02)
 
       // Write to SPSC ring — producer side (D-06: Atomics.store on write index)
       const writeIdx  = Atomics.load(this._controlRingIndices, 1);
@@ -158,7 +210,8 @@ export class AudioEngine {
         Atomics.store(this._controlRingIndices, 1, nextWrite);
       }
 
-      this._nextBeatTime += 60.0 / 120; // fixed 120 BPM for Phase 2 (Phase 3 replaces constant)
+      this._nextBeatTime += this._stepInterval; // dynamic step interval from updatePattern() (D-09)
+      this._barStep++;                           // advance bar position for next event
     }
   }
 }
