@@ -80,7 +80,7 @@ Plans:
   4. Beat 1 of every bar produces an accent click (distinct pitch or amplitude); all other positions produce a normal click; this behavior is the default without any user configuration.
   5. The `PatternState` model has the shape `{ bpm, tracks: Track[] }` where `Track` contains `{ stepCount, subdivision, beats: BeatPosition[] }`; v1 uses one track but the structure requires no refactor to add a second.
 
-**Plans:** 1/4 plans executed
+**Plans:** 2/4 plans executed
 
 Plans:
 **Wave 0** *(test infrastructure gate)*
@@ -89,7 +89,7 @@ Plans:
 
 **Wave 1** *(blocked on Wave 0 completion)*
 
-- [ ] 03-02-PLAN.md — Rust DSP accent extension: ACCENT_FREQ/ACCENT_AMP statics, set_accent_params export, voice branch in fill_output_buffer, cargo tests
+- [x] 03-02-PLAN.md — Rust DSP accent extension: ACCENT_FREQ/ACCENT_AMP statics, set_accent_params export, voice branch in fill_output_buffer, cargo tests
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
@@ -141,6 +141,6 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 |-------|----------------|--------|-----------|
 | 1. Infrastructure | 2/2 | Complete | 2026-05-19 |
 | 2. First Click | 2/2 | Complete   | 2026-05-19 |
-| 3. Timing Controls | 1/4 | In Progress|  |
+| 3. Timing Controls | 2/4 | In Progress|  |
 | 4. Per-Beat Patterns and White Noise | 0/TBD | Not started | - |
 | 5. Cross-Platform Validation | 0/TBD | Not started | - |
