@@ -29,6 +29,21 @@ class MetronomeProcessor extends AudioWorkletProcessor {
       // sampleRate is a global in AudioWorkletGlobalScope — do NOT pass via processorOptions.
       this._exports.init(sampleRate);
 
+      // Prime accent params from paramSAB slots 2 and 3 (written by main thread before 'ready').
+      // The 'init-buffers' message arrives before WASM instantiation completes, so _paramBuffer
+      // may already be set. If not (or if slots are 0), use safe defaults (1400 Hz / 1.3x amp).
+      if (this._paramBuffer) {
+        const freqHz = Atomics.load(this._paramBuffer, 2);
+        const ampMillis = Atomics.load(this._paramBuffer, 3);
+        if (freqHz > 0) {
+          this._exports.set_accent_params(freqHz, ampMillis / 1000.0);
+        } else {
+          this._exports.set_accent_params(1400.0, 1.3);
+        }
+      } else {
+        this._exports.set_accent_params(1400.0, 1.3);
+      }
+
       // Get the pointer to the static AUDIO_OUT buffer in WASM linear memory.
       const ptr = this._exports.get_output_buffer_ptr();
 
@@ -50,6 +65,10 @@ class MetronomeProcessor extends AudioWorkletProcessor {
         this._ringData = new Uint32Array(controlRing, 8, 256);
         // paramBuffer: 8 x Int32 parameter slots.
         this._paramBuffer = new Int32Array(paramBuffer, 0, 8);
+      } else if (event.data.type === 'update-accent' && this._exports) {
+        // Main thread called updatePattern() — propagate new accent params to WASM.
+        // event.data.freqHz: accent frequency in Hz; event.data.amp: amplitude multiplier (float).
+        this._exports.set_accent_params(event.data.freqHz, event.data.amp);
       }
     };
   }
