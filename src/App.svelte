@@ -116,6 +116,122 @@
     {engineState === 'running' ? 'Stop' : 'Play'}
   </button>
   <p class="status">Status: {engineState}</p>
+
+  <div class="controls-container">
+
+    <!-- BPM Section -->
+    <div class="section">
+      <h2>BPM</h2>
+      <div class="row">
+        <input
+          type="range"
+          class="bpm-slider"
+          min="20"
+          max="300"
+          step="1"
+          value={pattern.bpm}
+          oninput={onBpmSlider}
+        />
+        <input
+          type="text"
+          class="bpm-input"
+          value={pattern.bpm}
+          onblur={onBpmInput}
+          onkeydown={(e) => { if (e.key === 'Enter') onBpmInput(e) }}
+        />
+        <div class="step-buttons">
+          <button type="button" class="step-btn" onclick={() => adjustBpm(-5)}>-5</button>
+          <button type="button" class="step-btn" onclick={() => adjustBpm(-1)}>-1</button>
+          <button type="button" class="step-btn" onclick={() => adjustBpm(1)}>+1</button>
+          <button type="button" class="step-btn" onclick={() => adjustBpm(5)}>+5</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Time Signature Section -->
+    <div class="section">
+      <h2>Time</h2>
+      <div class="row">
+        <input
+          type="number"
+          class="num-input"
+          min="1"
+          max="12"
+          step="1"
+          value={numerator}
+          onchange={onNumeratorInput}
+          onblur={onNumeratorInput}
+        />
+        <span class="sep">/</span>
+        <select
+          class="denom-select"
+          value={pattern.tracks[0].denominator}
+          onchange={onDenominatorChange}
+        >
+          <option value={2}>2</option>
+          <option value={4}>4</option>
+          <option value={8}>8</option>
+          <option value={16}>16</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Subdivision Section -->
+    <div class="section">
+      <h2>Subdivision</h2>
+      <div class="subdiv-group" role="group">
+        {#each ([
+          { value: 'quarter',   label: 'Quarter'  },
+          { value: 'eighth',    label: '8th'       },
+          { value: 'triplet',   label: 'Triplet'   },
+          { value: 'sixteenth', label: '16th'      },
+        ] as const) as opt}
+          <button
+            type="button"
+            class="subdiv-option {pattern.tracks[0].subdivision === opt.value ? 'selected' : ''}"
+            onclick={() => onSubdivisionChange(opt.value as Subdivision)}
+          >{opt.label}</button>
+        {/each}
+      </div>
+    </div>
+
+    <!-- Accent Section -->
+    <div class="section">
+      <h2>Accent</h2>
+      <!-- Row 1: Pitch toggle -->
+      <div class="accent-row">
+        <span class="accent-label">Pitch (1400 Hz)</span>
+        <input
+          type="checkbox"
+          class="toggle"
+          checked={accentPitchOn}
+          onchange={() => { accentPitchOn = !accentPitchOn }}
+        />
+      </div>
+      <!-- Row 2: Amplitude slider + value + toggle -->
+      <div class="accent-row" style="margin-top: 16px;">
+        <span class="accent-label">Amplitude</span>
+        <input
+          type="range"
+          class="amp-slider {accentAmpOn ? '' : 'disabled'}"
+          min="1.0"
+          max="1.5"
+          step="0.1"
+          value={accentAmpValue}
+          disabled={!accentAmpOn}
+          oninput={(e) => { accentAmpValue = parseFloat((e.target as HTMLInputElement).value) }}
+        />
+        <span class="amp-value">{accentAmpValue.toFixed(1)}x</span>
+        <input
+          type="checkbox"
+          class="toggle"
+          checked={accentAmpOn}
+          onchange={() => { accentAmpOn = !accentAmpOn }}
+        />
+      </div>
+    </div>
+
+  </div>
 </main>
 
 <style>
@@ -137,6 +253,7 @@
   #play-btn {
     font-size: 1.25rem;
     padding: 0.75rem 2rem;
+    min-height: 44px;
     cursor: pointer;
     border-radius: 6px;
     border: 2px solid #333;
@@ -150,5 +267,202 @@
   .status {
     color: #666;
     font-size: 0.9rem;
+  }
+
+  /* Controls container */
+  .controls-container {
+    max-width: 480px;
+    width: 100%;
+    padding: 0 16px;
+  }
+
+  /* Section */
+  .section {
+    margin-bottom: 24px;
+  }
+
+  .section h2 {
+    font-size: 1.25rem;
+    font-weight: 600;
+    margin: 0 0 8px;
+  }
+
+  /* Row layout */
+  .row {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+
+  /* BPM controls */
+  .bpm-slider {
+    flex-grow: 1;
+  }
+
+  .bpm-input {
+    width: 64px;
+    text-align: center;
+    font-size: 16px;
+    border: 2px solid #ccc;
+    border-radius: 4px;
+    padding: 4px;
+  }
+
+  .bpm-input:focus {
+    border-color: #333;
+    outline: none;
+  }
+
+  .step-buttons {
+    display: flex;
+    gap: 4px;
+  }
+
+  .step-btn {
+    min-height: 44px;
+    padding: 8px 16px;
+    border: 2px solid #333;
+    border-radius: 6px;
+    background: #f0f0f0;
+    cursor: pointer;
+    font-size: 16px;
+  }
+
+  .step-btn:hover {
+    background: #e0e0e0;
+  }
+
+  .step-btn:active {
+    background: #333;
+    color: #fff;
+  }
+
+  /* Time signature */
+  .num-input {
+    width: 52px;
+    text-align: center;
+    font-size: 16px;
+    border: 2px solid #ccc;
+    border-radius: 4px;
+    padding: 4px;
+  }
+
+  .num-input:focus {
+    border-color: #333;
+    outline: none;
+  }
+
+  .sep {
+    margin: 0 8px;
+    color: #333;
+    font-size: 16px;
+  }
+
+  .denom-select {
+    width: 72px;
+    font-size: 16px;
+    border: 2px solid #ccc;
+    border-radius: 4px;
+    padding: 4px;
+  }
+
+  .denom-select:focus {
+    border-color: #333;
+    outline: none;
+  }
+
+  /* Subdivision picker */
+  .subdiv-group {
+    display: flex;
+    border: 2px solid #333;
+    border-radius: 6px;
+    overflow: hidden;
+  }
+
+  .subdiv-option {
+    min-height: 44px;
+    padding: 8px 16px;
+    border: none;
+    border-right: 1px solid #333;
+    background: #fff;
+    color: #333;
+    cursor: pointer;
+    font-size: 16px;
+    flex: 1;
+  }
+
+  .subdiv-option:last-child {
+    border-right: none;
+  }
+
+  .subdiv-option.selected {
+    background: #333;
+    color: #fff;
+  }
+
+  .subdiv-option:hover:not(.selected) {
+    background: #f0f0f0;
+  }
+
+  /* Accent panel */
+  .accent-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .accent-label {
+    font-size: 14px;
+    min-width: 120px;
+  }
+
+  .amp-slider {
+    width: 120px;
+  }
+
+  .amp-slider.disabled {
+    opacity: 0.5;
+    pointer-events: none;
+  }
+
+  .amp-value {
+    width: 36px;
+    font-size: 14px;
+    text-align: right;
+  }
+
+  /* Toggle (checkbox styled as pill) */
+  .toggle {
+    appearance: none;
+    -webkit-appearance: none;
+    width: 36px;
+    height: 20px;
+    border-radius: 10px;
+    background: #ccc;
+    cursor: pointer;
+    position: relative;
+    transition: background 0.2s;
+    flex-shrink: 0;
+  }
+
+  .toggle:checked {
+    background: #333;
+  }
+
+  .toggle::after {
+    content: '';
+    position: absolute;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: #fff;
+    top: 2px;
+    left: 2px;
+    transition: left 0.2s;
+  }
+
+  .toggle:checked::after {
+    left: 18px;
   }
 </style>
