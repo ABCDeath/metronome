@@ -592,17 +592,17 @@ The following cannot be mechanically verified — they require a human ear:
 
 ---
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **How does the worklet deliver accent params from paramSAB to WASM?**
    - What we know: paramSAB slots 2 and 3 will hold accent_freq and accent_amp (written by main thread). The worklet holds `this._paramBuffer` (Int32Array over paramSAB).
    - What's unclear: The worklet currently passes only 3 args to `fill_output_buffer`. Option A: add a dedicated `set_accent_params(freq, amp)` WASM export called once at init + on change (worklet detects slot change by comparing previous values). Option B: pass slots 2 and 3 as args 4 and 5 to `fill_output_buffer` on every call (simple but adds 2 Atomics.load per quantum). Option C: WASM reads paramSAB directly (not possible — WASM cannot hold a reference to SAB; it must be passed explicitly).
-   - Recommendation: **Option A** (set_accent_params export) for the init path. The worklet checks if slot 2 or 3 changed on each process() call and calls set_accent_params — but this adds an Atomics.load+compare each frame. Given that accent params change rarely, a lazy approach is fine. Alternatively: call set_accent_params from the worklet's `port.onmessage` handler when the main thread sends an "update-accent" message — cleaner, no per-frame overhead. The planner decides.
+   - RESOLVED: **Option A** — `set_accent_params` export called via `'update-accent'` postMessage from main thread (via `port.onmessage` handler in worklet). No per-frame Atomics.load overhead; called once at init and again whenever accent params change. Implemented in 03-03-PLAN.md Task 2.
 
 2. **Should `_barStep` be reset to 0 on BPM change (not just step count change)?**
    - What we know: `_barStep` is a bar position counter, independent of tempo.
    - What's unclear: At very fast BPM, `_barStep` wraps `Number.MAX_SAFE_INTEGER` only after ~285 million years at 300 BPM × 16th notes — not a practical concern.
-   - Recommendation: No reset on BPM change. Reset only on step count change (Pitfall P3-02).
+   - RESOLVED: No reset on BPM change. Reset only on step count change (Pitfall P3-02). Implemented in 03-03-PLAN.md Task 1.
 
 ---
 
