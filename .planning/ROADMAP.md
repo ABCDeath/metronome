@@ -15,7 +15,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 
 - [ ] **Phase 1: Infrastructure** - WASM build pipeline, AudioWorklet skeleton, SharedArrayBuffer ring, COOP/COEP headers, gesture gate — no sound yet but the entire audio stack is wired
 - [x] **Phase 2: First Click** - Rust click synthesis + lookahead scheduler running end-to-end; user can press play and hear a click at a fixed tempo (completed 2026-05-19)
-- [ ] **Phase 3: Timing Controls** - BPM, time signature, and subdivision controls connected to PatternState; beat 1 accent; user hears the correct pattern
+- [x] **Phase 3: Timing Controls** - BPM, time signature, and subdivision controls connected to PatternState; beat 1 accent; user hears the correct pattern (completed 2026-05-20)
 - [ ] **Phase 4: Per-Beat Patterns and White Noise** - Per-beat sound assignment UI; white noise mix slider; user can customize every beat position
 - [ ] **Phase 5: Cross-Platform Validation** - Android Chrome hardware testing, macOS Safari verification, timing budget audit; v1 ships
 
@@ -80,7 +80,7 @@ Plans:
   4. Beat 1 of every bar produces an accent click (distinct pitch or amplitude); all other positions produce a normal click; this behavior is the default without any user configuration.
   5. The `PatternState` model has the shape `{ bpm, tracks: Track[] }` where `Track` contains `{ stepCount, subdivision, beats: BeatPosition[] }`; v1 uses one track but the structure requires no refactor to add a second.
 
-**Plans:** 3/4 plans executed
+**Plans:** 4/4 plans complete
 
 Plans:
 **Wave 0** *(test infrastructure gate)*
@@ -97,7 +97,7 @@ Plans:
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
-- [ ] 03-04-PLAN.md — Svelte UI: BPM controls, time signature, subdivision picker, accent panel, $effect binding + human verify
+- [x] 03-04-PLAN.md — Svelte UI: BPM controls, time signature, subdivision picker, accent panel, $effect binding + human verify
 
 **UI hint:** yes
 
@@ -141,6 +141,6 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 |-------|----------------|--------|-----------|
 | 1. Infrastructure | 2/2 | Complete | 2026-05-19 |
 | 2. First Click | 2/2 | Complete   | 2026-05-19 |
-| 3. Timing Controls | 3/4 | In Progress|  |
+| 3. Timing Controls | 4/4 | Complete | 2026-05-20 |
 | 4. Per-Beat Patterns and White Noise | 0/TBD | Not started | - |
 | 5. Cross-Platform Validation | 0/TBD | Not started | - |
