@@ -269,30 +269,101 @@ mod tests {
         }
     }
 
-    // --- Phase 3 accent DSP stubs (Wave 1 will replace placeholder assertions) ---
+    // --- Phase 3 accent DSP tests ---
 
     #[test]
-    fn test_accent_amplitude_differs() {
-        // Wave 1: verify fill_output_buffer(0,1,0.0) peak > fill_output_buffer(0,0,0.0) peak
-        assert!(true);
+    fn test_set_accent_params_roundtrip() {
+        // Call set_accent_params, verify ACCENT_FREQ and ACCENT_AMP are updated.
+        unsafe {
+            set_accent_params(1400.0, 1.3);
+            let freq = std::ptr::addr_of!(ACCENT_FREQ).read();
+            let amp = std::ptr::addr_of!(ACCENT_AMP).read();
+            assert!((freq - 1400.0).abs() < f32::EPSILON * 1400.0 + f32::EPSILON,
+                "ACCENT_FREQ should be 1400.0 after set, got {}", freq);
+            assert!((amp - 1.3).abs() < f32::EPSILON * 1.3 + f32::EPSILON,
+                "ACCENT_AMP should be 1.3 after set, got {}", amp);
+
+            // Verify it also updates to different values
+            set_accent_params(1000.0, 1.0);
+            let freq2 = std::ptr::addr_of!(ACCENT_FREQ).read();
+            assert!((freq2 - 1000.0).abs() < f32::EPSILON * 1000.0 + f32::EPSILON,
+                "ACCENT_FREQ should be 1000.0 after second set, got {}", freq2);
+        }
     }
 
     #[test]
     fn test_accent_pitch_differs() {
-        // Wave 1: verify PHASE_INC differs for voice=1 vs voice=0
-        assert!(true);
+        // Verify PHASE_INC is set to 1400/SR for voice=1 and 1000/SR for voice=0.
+        unsafe {
+            init(44100.0);
+            set_accent_params(1400.0, 1.3);
+
+            // Accent trigger (voice=1): PHASE_INC = 1400 / 44100
+            fill_output_buffer(0, 1, 0.0);
+            let accent_phase_inc = std::ptr::addr_of!(PHASE_INC).read();
+            let expected_accent = 1400.0_f32 / 44100.0;
+            assert!((accent_phase_inc - expected_accent).abs() < 1e-6,
+                "Accent PHASE_INC should be {}, got {}", expected_accent, accent_phase_inc);
+
+            // Normal trigger (voice=0): PHASE_INC = 1000 / 44100
+            fill_output_buffer(0, 0, 0.0);
+            let normal_phase_inc = std::ptr::addr_of!(PHASE_INC).read();
+            let expected_normal = 1000.0_f32 / 44100.0;
+            assert!((normal_phase_inc - expected_normal).abs() < 1e-6,
+                "Normal PHASE_INC should be {}, got {}", expected_normal, normal_phase_inc);
+
+            assert_ne!(accent_phase_inc, normal_phase_inc,
+                "Accent and normal PHASE_INC must differ");
+        }
+    }
+
+    #[test]
+    fn test_accent_amplitude_differs() {
+        // Verify peak amplitude is higher for voice=1 (amp=1.3) than voice=0 (amp=1.0).
+        unsafe {
+            init(44100.0);
+            set_accent_params(1400.0, 1.3);
+
+            // Accent trigger: record peak amplitude
+            std::ptr::addr_of_mut!(ACTIVE).write(false);
+            fill_output_buffer(0, 1, 0.0);
+            let accent_peak = (0..128_usize)
+                .map(|i| read_out(i).abs())
+                .fold(0.0_f32, f32::max);
+
+            // Normal trigger: record peak amplitude
+            std::ptr::addr_of_mut!(ACTIVE).write(false);
+            fill_output_buffer(0, 0, 0.0);
+            let normal_peak = (0..128_usize)
+                .map(|i| read_out(i).abs())
+                .fold(0.0_f32, f32::max);
+
+            assert!(accent_peak > normal_peak,
+                "Accent peak ({}) must exceed normal peak ({})", accent_peak, normal_peak);
+        }
     }
 
     #[test]
     fn test_phase_inc_reset_on_normal() {
-        // Wave 1: trigger accent then normal, verify PHASE_INC returns to CLICK_FREQ/SR
-        assert!(true);
-    }
+        // Pitfall P3-03: after an accent trigger, a normal trigger must restore PHASE_INC
+        // to CLICK_FREQ / SAMPLE_RATE, not leave it at the accent frequency.
+        unsafe {
+            init(44100.0);
+            set_accent_params(1400.0, 1.3);
 
-    #[test]
-    fn test_set_accent_params_roundtrip() {
-        // Wave 1: call set_accent_params(1400.0, 1.3), verify statics
-        assert!(true);
+            // Accent trigger sets PHASE_INC to 1400 / 44100
+            fill_output_buffer(0, 1, 0.0);
+            let after_accent = std::ptr::addr_of!(PHASE_INC).read();
+            assert!((after_accent - 1400.0_f32 / 44100.0).abs() < 1e-6,
+                "PHASE_INC after accent trigger should be 1400/44100, got {}", after_accent);
+
+            // Normal trigger must reset PHASE_INC to CLICK_FREQ / SAMPLE_RATE
+            fill_output_buffer(0, 0, 0.0);
+            let after_normal = std::ptr::addr_of!(PHASE_INC).read();
+            let expected = CLICK_FREQ / 44100.0;
+            assert!((after_normal - expected).abs() < 1e-6,
+                "PHASE_INC after normal trigger should be {}, got {}", expected, after_normal);
+        }
     }
 
     #[test]
