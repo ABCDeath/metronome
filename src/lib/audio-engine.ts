@@ -111,8 +111,10 @@ export class AudioEngine {
     }
 
     this._state = 'running';
-    // Seed nextBeatTime to now — prevents flooding the ring with stale events (RESEARCH.md Pitfall 2)
-    this._nextBeatTime = this._audioCtx!.currentTime;
+    // Seed nextBeatTime 50ms ahead so the first quantum is always in the future when the
+    // worklet processes it. Seeding at exactly currentTime causes the first beat's quantum
+    // to be stale by the time the scheduler fires 25ms later (worklet drains it silently).
+    this._nextBeatTime = this._audioCtx!.currentTime + 0.05;
     this._schedulerIntervalId = setInterval(() => this._schedulerTick(), 25);
     this._onStateChange?.(this._state);
   }
@@ -165,18 +167,24 @@ export class AudioEngine {
     this._stepCount    = newStepCount;
     this._beats        = track.beats;
 
+    // Read accent params unconditionally so Svelte $effect tracks these fields on every run.
+    // If reads are inside null-guarded blocks, Svelte won't register them as dependencies on
+    // the first effect run (before start()), and toggle changes won't trigger updatePattern.
+    const accentFreqHz = state.accentFreqHz;
+    const accentAmpMillis = state.accentAmpMillis;
+
     // Write accent params to paramSAB — guarded for pre-start() calls (Pitfall P3-04)
     if (this._paramBuffer) {
-      Atomics.store(this._paramBuffer, 2, state.accentFreqHz);
-      Atomics.store(this._paramBuffer, 3, state.accentAmpMillis);
+      Atomics.store(this._paramBuffer, 2, accentFreqHz);
+      Atomics.store(this._paramBuffer, 3, accentAmpMillis);
     }
 
     // Notify worklet to update accent params immediately (Research Open Question 1, Option A)
     if (this._workletNode) {
       this._workletNode.port.postMessage({
         type: 'update-accent',
-        freqHz: state.accentFreqHz,
-        amp: state.accentAmpMillis / 1000.0,
+        freqHz: accentFreqHz,
+        amp: accentAmpMillis / 1000.0,
       });
     }
   }
