@@ -10,6 +10,8 @@ static mut PHASE_INC: f32 = 0.0;        // set in init() = CLICK_FREQ / SAMPLE_R
 static mut ENVELOPE_GAIN: f32 = 0.0;    // current envelope amplitude
 static mut DECAY_COEFF: f32 = 0.0;      // set in init() = exp(-1 / decay_samples)
 static mut ACTIVE: bool = false;         // is the click envelope currently running?
+static mut ACCENT_FREQ: f32 = 1400.0;   // D-02: 1400 Hz accent vs 1000 Hz normal
+static mut ACCENT_AMP: f32 = 1.3;       // D-03: default 1.3× multiplier (both toggles on)
 
 const CLICK_FREQ: f32 = 1000.0;         // D-01: 1000 Hz warm click
 const DECAY_MS: f32 = 12.0;             // D-02: 12ms (midpoint of 10–15ms range)
@@ -36,17 +38,25 @@ fn triangle_sample(phase: f32) -> f32 {
 /// Called every AudioWorklet process() callback (128 samples per call).
 /// sample_offset: sample within this quantum where the click starts (0–127),
 ///                or NO_BEAT_SENTINEL (0xFF) if no beat fires this quantum.
-/// _voice:        voice type (0=normal; reserved for Phase 3 accent/ghost).
+/// voice:         voice type (0=normal click, 1=accent click).
 /// _noise_gain:   white noise mix level (unused until Phase 3).
 #[no_mangle]
-pub extern "C" fn fill_output_buffer(sample_offset: u32, _voice: u32, _noise_gain: f32) {
+pub extern "C" fn fill_output_buffer(sample_offset: u32, voice: u32, _noise_gain: f32) {
     // SAFETY: Single-threaded WASM; no concurrent mutation possible.
     unsafe {
         let ptr = std::ptr::addr_of_mut!(AUDIO_OUT) as *mut f32;
 
         // Trigger: arm envelope if a beat fires this quantum (T-02-01: sentinel guards OOB).
         if sample_offset != NO_BEAT_SENTINEL {
-            std::ptr::addr_of_mut!(ENVELOPE_GAIN).write(1.0_f32);
+            let (freq, base_amp) = if voice == 1 {
+                (std::ptr::addr_of!(ACCENT_FREQ).read(),
+                 std::ptr::addr_of!(ACCENT_AMP).read())
+            } else {
+                (CLICK_FREQ, 1.0_f32)
+            };
+            // Always set PHASE_INC on every trigger (Pitfall P3-03: must restore normal freq)
+            std::ptr::addr_of_mut!(PHASE_INC).write(freq / std::ptr::addr_of!(SAMPLE_RATE).read());
+            std::ptr::addr_of_mut!(ENVELOPE_GAIN).write(base_amp);
             std::ptr::addr_of_mut!(PHASE_ACCUM).write(0.0_f32);
             std::ptr::addr_of_mut!(ACTIVE).write(true);
         }
@@ -97,6 +107,18 @@ pub extern "C" fn init(sample_rate: f32) {
         let decay_samples = (DECAY_MS / 1000.0) * sample_rate;
         let decay_coeff = (-1.0_f32 / decay_samples).exp();
         std::ptr::addr_of_mut!(DECAY_COEFF).write(decay_coeff);
+    }
+}
+
+/// Sets accent voice DSP parameters. Called by the AudioWorklet when accent settings change.
+/// freq_hz: click frequency for accent beats (default 1400.0 Hz).
+/// amp:     amplitude multiplier for accent beats (default 1.3).
+#[no_mangle]
+pub extern "C" fn set_accent_params(freq_hz: f32, amp: f32) {
+    // SAFETY: Single-threaded WASM; no concurrent mutation possible.
+    unsafe {
+        std::ptr::addr_of_mut!(ACCENT_FREQ).write(freq_hz);
+        std::ptr::addr_of_mut!(ACCENT_AMP).write(amp);
     }
 }
 
