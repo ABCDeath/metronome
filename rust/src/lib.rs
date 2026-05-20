@@ -52,7 +52,7 @@ pub extern "C" fn fill_output_buffer(sample_offset: u32, voice: u32, _noise_gain
                 (std::ptr::addr_of!(ACCENT_FREQ).read(),
                  std::ptr::addr_of!(ACCENT_AMP).read())
             } else {
-                (CLICK_FREQ, 1.0_f32)
+                (CLICK_FREQ, 0.75_f32)
             };
             // Always set PHASE_INC on every trigger (Pitfall P3-03: must restore normal freq)
             std::ptr::addr_of_mut!(PHASE_INC).write(freq / std::ptr::addr_of!(SAMPLE_RATE).read());
