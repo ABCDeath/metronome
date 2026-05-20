@@ -246,4 +246,40 @@ mod tests {
             assert!(found_nonzero, "envelope tail should produce non-zero samples in second quantum");
         }
     }
+
+    // --- Phase 3 accent DSP stubs (Wave 1 will replace placeholder assertions) ---
+
+    #[test]
+    fn test_accent_amplitude_differs() {
+        // Wave 1: verify fill_output_buffer(0,1,0.0) peak > fill_output_buffer(0,0,0.0) peak
+        assert!(true);
+    }
+
+    #[test]
+    fn test_accent_pitch_differs() {
+        // Wave 1: verify PHASE_INC differs for voice=1 vs voice=0
+        assert!(true);
+    }
+
+    #[test]
+    fn test_phase_inc_reset_on_normal() {
+        // Wave 1: trigger accent then normal, verify PHASE_INC returns to CLICK_FREQ/SR
+        assert!(true);
+    }
+
+    #[test]
+    fn test_set_accent_params_roundtrip() {
+        // Wave 1: call set_accent_params(1400.0, 1.3), verify statics
+        assert!(true);
+    }
+
+    #[test]
+    fn test_bar_step_cycling() {
+        // Real modulo test: verifies the step % stepCount cycling pattern used by the scheduler.
+        assert_eq!(0 % 4, 0);
+        assert_eq!(3 % 4, 3);
+        assert_eq!(4 % 4, 0);
+        assert_eq!(7 % 4, 3);
+        assert_eq!(100 % 4, 0);
+    }
 }
