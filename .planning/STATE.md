@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: executing
+status: verifying
 stopped_at: Phase 3 UI-SPEC approved
-last_updated: "2026-05-20T04:35:10.454Z"
-last_activity: 2026-05-20 -- Phase 03 planning complete
+last_updated: "2026-05-20T05:24:13.490Z"
+last_activity: 2026-05-20
 progress:
   total_phases: 5
   completed_phases: 2
   total_plans: 8
-  completed_plans: 4
+  completed_plans: 5
   percent: 40
 ---
 
@@ -27,10 +27,10 @@ See: .planning/PROJECT.md (updated 2026-05-18)
 
 Phase: 02 (first-click) — COMPLETE
 Plan: 2 of 2 — all plans done
-Status: Ready to execute
-Last activity: 2026-05-20 -- Phase 03 planning complete
+Status: Phase complete — ready for verification
+Last activity: 2026-05-20
 
-Progress: [██████████] 100%
+Progress: [██████░░░░] 63%
 
 ## Performance Metrics
 
@@ -53,6 +53,7 @@ Progress: [██████████] 100%
 
 *Updated after each plan completion*
 | Phase 02-first-click P02 | 20 | 2 tasks | 2 files |
+| Phase 03-timing-controls P01 | 7min | 2 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -74,6 +75,9 @@ Recent decisions affecting current work:
 - 02-02: nextBeatTime seeded to audioCtx.currentTime on start() (not 0) — prevents ring flood on first scheduler tick (RESEARCH Pitfall 2, T-02-06)
 - 02-02: clearInterval + Atomics.store ring reset in stop() before suspend() — prevents stale event burst on Play/Stop/Play cycle (T-02-04)
 - 02-02: PLATFORM-01 partially satisfied — macOS Chrome verified by user; macOS Safari deferred to Phase 5 per D-09
+- 03-01: vitest.config.ts uses environment: node — pure math functions need no DOM; avoids jsdom overhead
+- 03-01: accentAmpMillis stored as integer x1000 (1300 = 1.3x) for Atomics.store compatibility — avoids float-to-int conversions in audio hot path
+- 03-01: accentFreqHz and accentAmpMillis are top-level PatternState fields (global accent, not per-track)
 
 ### Pending Todos
 
@@ -97,7 +101,7 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-05-19T19:40:08.473Z
-Stopped at: Phase 3 UI-SPEC approved
-Resume file: .planning/phases/03-timing-controls/03-UI-SPEC.md
-Next: Phase 3 — Timing Controls — ready for plan-phase
+Last session: 2026-05-20T05:28:00Z
+Stopped at: Completed 03-01-PLAN.md
+Resume file: None
+Next: Phase 3 — Timing Controls — execute Plan 02

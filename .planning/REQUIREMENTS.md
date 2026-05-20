@@ -4,15 +4,15 @@
 
 ### Timing
 
-- [ ] **TIMING-01**: User can set BPM in the range 20–300
-- [ ] **TIMING-02**: User can set time signature with a numerator and common denominators (e.g. 4/4, 3/4, 7/8, 5/4, 6/8)
-- [ ] **TIMING-03**: User can select subdivision (quarter notes, 8th notes, triplets, 16th notes)
+- [x] **TIMING-01**: User can set BPM in the range 20–300
+- [x] **TIMING-02**: User can set time signature with a numerator and common denominators (e.g. 4/4, 3/4, 7/8, 5/4, 6/8)
+- [x] **TIMING-03**: User can select subdivision (quarter notes, 8th notes, triplets, 16th notes)
 - [x] **TIMING-04**: User can start and stop the metronome via a play/stop control
 
 ### Pattern
 
 - [ ] **PATTERN-01**: Each beat position in the pattern has an independently assignable click sound
-- [ ] **PATTERN-02**: Beat 1 defaults to an accent sound; all other positions default to a normal click sound
+- [x] **PATTERN-02**: Beat 1 defaults to an accent sound; all other positions default to a normal click sound
 
 ### Audio
 

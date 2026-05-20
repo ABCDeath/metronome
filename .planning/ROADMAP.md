@@ -80,12 +80,12 @@ Plans:
   4. Beat 1 of every bar produces an accent click (distinct pitch or amplitude); all other positions produce a normal click; this behavior is the default without any user configuration.
   5. The `PatternState` model has the shape `{ bpm, tracks: Track[] }` where `Track` contains `{ stepCount, subdivision, beats: BeatPosition[] }`; v1 uses one track but the structure requires no refactor to add a second.
 
-**Plans:** 4 plans
+**Plans:** 1/4 plans executed
 
 Plans:
 **Wave 0** *(test infrastructure gate)*
 
-- [ ] 03-01-PLAN.md — Install Vitest, create PatternState types and pure utility functions, write tests
+- [x] 03-01-PLAN.md — Install Vitest, create PatternState types and pure utility functions, write tests
 
 **Wave 1** *(blocked on Wave 0 completion)*
 
@@ -141,6 +141,6 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 |-------|----------------|--------|-----------|
 | 1. Infrastructure | 2/2 | Complete | 2026-05-19 |
 | 2. First Click | 2/2 | Complete   | 2026-05-19 |
-| 3. Timing Controls | 0/4 | Not started | - |
+| 3. Timing Controls | 1/4 | In Progress|  |
 | 4. Per-Beat Patterns and White Noise | 0/TBD | Not started | - |
 | 5. Cross-Platform Validation | 0/TBD | Not started | - |
