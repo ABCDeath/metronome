@@ -11,7 +11,7 @@
 
 ### Pattern
 
-- [ ] **PATTERN-01**: Each beat position in the pattern has an independently assignable click sound
+- [x] **PATTERN-01**: Each beat position in the pattern has an independently assignable click sound
 - [x] **PATTERN-02**: Beat 1 defaults to an accent sound; all other positions default to a normal click sound
 
 ### Audio

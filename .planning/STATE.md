@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: in_progress
-stopped_at: Phase 3 complete
-last_updated: "2026-05-20T22:32:00.000Z"
-last_activity: 2026-05-20
+status: verifying
+stopped_at: Completed 04-per-beat-patterns/04-03-PLAN.md
+last_updated: "2026-05-21T07:04:36.253Z"
+last_activity: 2026-05-21
 progress:
   total_phases: 5
   completed_phases: 3
-  total_plans: 8
-  completed_plans: 8
+  total_plans: 12
+  completed_plans: 9
   percent: 60
 ---
 
@@ -27,10 +27,10 @@ See: .planning/PROJECT.md (updated 2026-05-18)
 
 Phase: 03 (timing-controls) — COMPLETE
 Plan: 4 of 4 — all plans done
-Status: Phase complete — ready for Phase 4
-Last activity: 2026-05-20
+Status: Phase complete — ready for verification
+Last activity: 2026-05-21
 
-Progress: [██████████] 60%
+Progress: [████████░░] 75%
 
 ## Performance Metrics
 
@@ -54,6 +54,7 @@ Progress: [██████████] 60%
 *Updated after each plan completion*
 | Phase 02-first-click P02 | 20 | 2 tasks | 2 files |
 | Phase 03-timing-controls P01 | 7min | 2 tasks | 5 files |
+| Phase 04-per-beat-patterns P03 | 1min | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -78,6 +79,8 @@ Recent decisions affecting current work:
 - 03-01: vitest.config.ts uses environment: node — pure math functions need no DOM; avoids jsdom overhead
 - 03-01: accentAmpMillis stored as integer x1000 (1300 = 1.3x) for Atomics.store compatibility — avoids float-to-int conversions in audio hot path
 - 03-01: accentFreqHz and accentAmpMillis are top-level PatternState fields (global accent, not per-track)
+- [Phase ?]: Optional existingBeats param in rebuildBeats() enables preserve-on-resize semantics — backwards-compatible; all Phase 3 callers unaffected
+- [Phase ?]: Array.from implicit truncation for shrink case — no explicit slice; length bound handles it cleanly
 
 ### Pending Todos
 
@@ -101,7 +104,7 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-05-20T22:32:00.000Z
-Stopped at: Phase 3 complete — all 4 plans done
+Last session: 2026-05-21T07:04:36.246Z
+Stopped at: Completed 04-per-beat-patterns/04-03-PLAN.md
 Resume file: None
 Next: Phase 4 — Per-Beat Patterns and White Noise
