@@ -391,22 +391,22 @@ document.title; // quick connectivity check
 
 ---
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **wasm-opt on CI**
    - What we know: wasm-opt is not listed as a pre-installed tool on Cloudflare Pages v3 build image; apt-get is not available.
    - What's unclear: Whether downloading a binaryen binary via curl in build.sh is worth the extra build time vs. simply accepting the unoptimized WASM.
-   - Recommendation: Accept the xtask fallback (warn-and-continue without wasm-opt) for v1. The WASM binary for this project is small; size savings are marginal. Document as a follow-up if binary size becomes a concern.
+   - RESOLVED: Accept the xtask fallback (warn-and-continue without wasm-opt) for v1. The WASM binary for this project is small; size savings are marginal. Document as a follow-up if binary size becomes a concern. Plan 05-01 delegates to `cargo xtask build`, which already handles wasm-opt absence gracefully.
 
 2. **AUDIO-03 and AUDIO-04 formal audit**
    - What we know: Context.md marks these as Claude's discretion. AUDIO-03 (scheduling gap) is traceable to Phase 1 but not formally verified on Android. AUDIO-04 (amplitude consistency) has no automated test.
    - What's unclear: Whether a 60-second manual listen + Performance trace is sufficient evidence or whether a more rigorous test is required.
-   - Recommendation: Include both in the manual checklist (listen-only for AUDIO-04; Performance trace confirms no GC for AUDIO-03 by implication). Mark both requirements as verified-manually in REQUIREMENTS.md after successful test. Defer automated measurement to v2.
+   - RESOLVED: Include both in the manual checklist (listen-only for AUDIO-04; Performance trace confirms no GC for AUDIO-03 by implication). Mark both requirements as verified-manually after successful Android test. Defer automated measurement to v2. Plan 05-02 CHECKLIST.md covers both.
 
 3. **Cloudflare Pages vs. Workers migration**
    - What we know: Cloudflare announced in April 2025 that Pages is deprecated in favor of Workers with Static Assets; `_headers` is supported in both.
    - What's unclear: The user may prefer to deploy directly to Workers Static Assets to avoid a future migration. The difference for a pure static site is minimal.
-   - Recommendation: Deploy to Cloudflare Pages (as locked by D-06). The `_headers` file works identically. Note the migration path in the checklist for awareness.
+   - RESOLVED: Deploy to Cloudflare Pages as locked by D-06. The `_headers` file works identically on Workers Static Assets if migration is needed later. No action required for v1.
 
 ---
 
