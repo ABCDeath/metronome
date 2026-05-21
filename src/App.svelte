@@ -17,6 +17,9 @@
   // numerator tracked separately for the number input (time sig numerator 1–12).
   let numerator = $state(4)
 
+  // Noise level state (0–100 integer, maps to 0–1000 millis for setNoiseGain).
+  let noiseLevel = $state(0)
+
   // Accent toggle state (D-02, D-03): both default on.
   let accentPitchOn = $state(true)
   let accentAmpOn = $state(true)
@@ -38,6 +41,8 @@
       await engine.start()
       // P3-04 safety: write accent params after SAB is initialized.
       engine.updatePattern(pattern)
+      // Replay noise slider value — SAB is now ready (audio-engine also replays _pendingNoiseGainMillis).
+      engine.setNoiseGain(Math.round(noiseLevel * 10))
     } else {
       await engine.stop()
     }
@@ -72,7 +77,7 @@
     const subdivMult = SUBDIV_MULT[pattern.tracks[0].subdivision]
     const stepCount = numerator * subdivMult
     pattern.tracks[0].stepCount = stepCount
-    pattern.tracks[0].beats = rebuildBeats(stepCount)
+    pattern.tracks[0].beats = rebuildBeats(stepCount, pattern.tracks[0].beats)
   }
 
   function onNumeratorInput(e: Event) {
@@ -97,7 +102,7 @@
     pattern.tracks[0].subdivision = subdiv
     const stepCount = numerator * SUBDIV_MULT[subdiv]
     pattern.tracks[0].stepCount = stepCount
-    pattern.tracks[0].beats = rebuildBeats(stepCount)
+    pattern.tracks[0].beats = rebuildBeats(stepCount, pattern.tracks[0].beats)
   }
 
   // --- Accent helpers ---
@@ -107,6 +112,21 @@
     pattern.accentFreqHz = accentPitchOn ? 1400 : 1000
     // D-03: accentAmpValue * 1000 when amp toggle on, 1000 (1.0×) when off.
     pattern.accentAmpMillis = accentAmpOn ? Math.round(accentAmpValue * 1000) : 1000
+  }
+
+  // --- Beat grid helpers ---
+
+  function cycleBeatVoice(i: number) {
+    // Cycle voice 0 (Normal) → 1 (Accent) → 2 (Silent) → 0.
+    // Direct property mutation on Svelte 5 $state proxy triggers $effect → engine.updatePattern().
+    pattern.tracks[0].beats[i].voice = (pattern.tracks[0].beats[i].voice + 1) % 3
+  }
+
+  // --- Noise helpers ---
+
+  function onNoiseInput(e: Event) {
+    noiseLevel = parseInt((e.target as HTMLInputElement).value, 10)
+    engine.setNoiseGain(Math.round(noiseLevel * 10))
   }
 </script>
 
@@ -195,6 +215,24 @@
       </div>
     </div>
 
+    <!-- Pattern Section -->
+    <div class="section">
+      <h2>Pattern</h2>
+      <div class="beat-grid" role="group" aria-label="Beat pattern">
+        {#each pattern.tracks[0].beats as beat, i}
+          {@const voiceLabel = beat.voice === 1 ? 'A' : beat.voice === 2 ? '\u2014' : 'N'}
+          {@const voiceState = beat.voice === 1 ? 'Accent' : beat.voice === 2 ? 'Silent' : 'Normal'}
+          {@const voiceClass = beat.voice === 1 ? 'beat-cell-accent' : beat.voice === 2 ? 'beat-cell-silent' : 'beat-cell-normal'}
+          <button
+            type="button"
+            class="beat-cell {voiceClass}"
+            onclick={() => cycleBeatVoice(i)}
+            aria-label="Beat {i + 1}: {voiceState}"
+          >{voiceLabel}</button>
+        {/each}
+      </div>
+    </div>
+
     <!-- Accent Section -->
     <div class="section">
       <h2>Accent</h2>
@@ -228,6 +266,23 @@
           checked={accentAmpOn}
           onchange={() => { accentAmpOn = !accentAmpOn }}
         />
+      </div>
+    </div>
+
+    <!-- Noise Section -->
+    <div class="section">
+      <h2>Noise</h2>
+      <div class="row">
+        <input
+          type="range"
+          class="noise-slider"
+          min="0"
+          max="100"
+          step="1"
+          value={noiseLevel}
+          oninput={onNoiseInput}
+        />
+        <span class="noise-value">{noiseLevel}%</span>
       </div>
     </div>
 
@@ -464,5 +519,70 @@
 
   .toggle:checked::after {
     left: 18px;
+  }
+
+  /* Beat grid */
+  .beat-grid {
+    display: flex;
+    flex-wrap: nowrap;
+    gap: 4px;
+    overflow-x: auto;
+  }
+
+  .beat-cell {
+    flex-shrink: 0;
+    min-width: 44px;
+    min-height: 44px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    border: 2px solid #333333;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #ffffff;
+    color: #333333;
+  }
+
+  .beat-cell-normal {
+    background: #ffffff;
+    color: #333333;
+    border-color: #333333;
+  }
+
+  .beat-cell-normal:hover {
+    background: #f0f0f0;
+  }
+
+  .beat-cell-accent {
+    background: #333333;
+    color: #ffffff;
+    border-color: #333333;
+  }
+
+  .beat-cell-accent:hover {
+    background: #555555;
+  }
+
+  .beat-cell-silent {
+    background: #f0f0f0;
+    color: #999999;
+    border-color: #cccccc;
+  }
+
+  .beat-cell-silent:hover {
+    background: #e0e0e0;
+    border-color: #aaaaaa;
+  }
+
+  /* Noise slider */
+  .noise-slider {
+    flex-grow: 1;
+  }
+
+  .noise-value {
+    width: 36px;
+    font-size: 14px;
+    text-align: right;
   }
 </style>
