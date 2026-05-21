@@ -69,6 +69,9 @@ class MetronomeProcessor extends AudioWorkletProcessor {
         // Main thread called updatePattern() — propagate new accent params to WASM.
         // event.data.freqHz: accent frequency in Hz; event.data.amp: amplitude multiplier (float).
         this._exports.set_accent_params(event.data.freqHz, event.data.amp);
+      } else if (event.data.type === 'set-click-sound' && this._exports) {
+        // User selected a new click sound. event.data.sound: 0=beep, 1=woodblock, 2=sticks.
+        this._exports.set_click_sound(event.data.sound);
       }
     };
   }

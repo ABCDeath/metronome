@@ -13,11 +13,19 @@ static mut ACTIVE: bool = false;         // is the click envelope currently runn
 static mut ACCENT_FREQ: f32 = 1400.0;   // D-02: 1400 Hz accent vs 1000 Hz normal
 static mut ACCENT_AMP: f32 = 1.3;       // D-03: default 1.3× multiplier (both toggles on)
 static mut PRNG_STATE: u32 = 12345;     // D-12: xorshift32 seed — must be non-zero
+static mut CLICK_SOUND: u32 = 0;        // 0=beep, 1=woodblock, 2=sticks
+static mut DECAY_COEFF_WOOD: f32 = 0.0; // derived in init(): 7ms decay for woodblock
+static mut DECAY_COEFF_STICK: f32 = 0.0; // derived in init(): 5ms decay for sticks
 
 const CLICK_FREQ: f32 = 1000.0;         // D-01: 1000 Hz warm click
 const DECAY_MS: f32 = 12.0;             // D-02: 12ms (midpoint of 10–15ms range)
 const SILENCE_THRESHOLD: f32 = 1.0e-4;  // stop rendering when envelope falls below this
 const NO_BEAT_SENTINEL: u32 = 0xFF;     // sample_offset value meaning "no beat this quantum"
+const WOOD_CLICK_FREQ: f32 = 600.0;     // woodblock normal: lower, hollow sine
+const WOOD_ACCENT_FREQ: f32 = 900.0;    // woodblock accent: higher pitch
+const WOOD_DECAY_MS: f32 = 7.0;         // woodblock: shorter, punchier than beep
+const STICK_CLICK_FREQ: f32 = 3000.0;   // sticks: high-freq tone component
+const STICK_DECAY_MS: f32 = 5.0;        // sticks: very fast, percussive
 
 /// Returns a pointer to the static output buffer.
 /// The AudioWorklet creates a Float32Array view over this pointer once at init.
@@ -30,10 +38,17 @@ pub extern "C" fn get_output_buffer_ptr() -> *const f32 {
 
 /// Triangle wave sample function.
 /// phase in [0.0, 1.0) → output in [-1.0, 1.0].
-/// Odd harmonics at 1/n² amplitudes — mechanical woodblock character (D-03).
 #[inline(always)]
 fn triangle_sample(phase: f32) -> f32 {
     (phase - 0.5).abs() * 4.0 - 1.0
+}
+
+/// Sine wave sample function.
+/// phase in [0.0, 1.0) → output in [-1.0, 1.0].
+/// Used for woodblock: cleaner, more hollow tone than triangle.
+#[inline(always)]
+fn sine_sample(phase: f32) -> f32 {
+    (phase * core::f32::consts::TAU).sin()
 }
 
 /// xorshift32 PRNG — Marsaglia (2003) canonical shift triple (13, 17, 5).
@@ -60,19 +75,27 @@ pub extern "C" fn fill_output_buffer(sample_offset: u32, voice: u32, noise_gain:
     unsafe {
         let ptr = std::ptr::addr_of_mut!(AUDIO_OUT) as *mut f32;
 
+        // Read sound type once — used in both trigger and sample loop.
+        let sound = std::ptr::addr_of!(CLICK_SOUND).read();
+
         // Trigger: arm envelope if a beat fires this quantum (T-02-01: sentinel guards OOB).
         if sample_offset != NO_BEAT_SENTINEL {
             if voice == 2 {
                 // D-14: Silent voice — beat event fires (bar position advances) but no click
                 // synthesis. ACTIVE is not set. Noise mixing still runs unconditionally below.
             } else {
-                let (freq, base_amp) = if voice == 1 {
-                    (std::ptr::addr_of!(ACCENT_FREQ).read(),
-                     std::ptr::addr_of!(ACCENT_AMP).read())
-                } else {
-                    (CLICK_FREQ, 0.75_f32)
+                let accent_freq = std::ptr::addr_of!(ACCENT_FREQ).read();
+                let accent_amp  = std::ptr::addr_of!(ACCENT_AMP).read();
+                // Always set PHASE_INC on every trigger (Pitfall P3-03: must restore normal freq).
+                // Freq and base amplitude depend on sound type and voice.
+                let (freq, base_amp) = match (sound, voice) {
+                    (0, 1) => (accent_freq,     accent_amp), // beep accent
+                    (0, _) => (CLICK_FREQ,       0.75_f32),  // beep normal
+                    (1, 1) => (WOOD_ACCENT_FREQ, accent_amp), // woodblock accent
+                    (1, _) => (WOOD_CLICK_FREQ,  0.85_f32),  // woodblock normal
+                    (_, 1) => (STICK_CLICK_FREQ, accent_amp), // sticks accent
+                    _      => (STICK_CLICK_FREQ, 0.85_f32),  // sticks normal
                 };
-                // Always set PHASE_INC on every trigger (Pitfall P3-03: must restore normal freq)
                 std::ptr::addr_of_mut!(PHASE_INC).write(freq / std::ptr::addr_of!(SAMPLE_RATE).read());
                 std::ptr::addr_of_mut!(ENVELOPE_GAIN).write(base_amp);
                 std::ptr::addr_of_mut!(PHASE_ACCUM).write(0.0_f32);
@@ -80,26 +103,40 @@ pub extern "C" fn fill_output_buffer(sample_offset: u32, voice: u32, noise_gain:
             }
         }
 
+        // Cache decay coefficient for this sound type outside the sample loop.
+        let decay = match sound {
+            1 => std::ptr::addr_of!(DECAY_COEFF_WOOD).read(),
+            2 => std::ptr::addr_of!(DECAY_COEFF_STICK).read(),
+            _ => std::ptr::addr_of!(DECAY_COEFF).read(),
+        };
+
+        // D-10: PRNG runs unconditionally every sample regardless of click activity or voice.
         for i in 0..128_usize {
+            let raw_noise = xorshift32_next();
+            let noise_f = (raw_noise as i32 as f32) / 2147483648.0_f32;
+
             let sample = if std::ptr::addr_of!(ACTIVE).read()
                 && (sample_offset == NO_BEAT_SENTINEL || i >= sample_offset as usize)
             {
                 let phase = std::ptr::addr_of!(PHASE_ACCUM).read();
-                let gain = std::ptr::addr_of!(ENVELOPE_GAIN).read();
+                let gain  = std::ptr::addr_of!(ENVELOPE_GAIN).read();
 
-                // Triangle wave synthesis
-                let s = triangle_sample(phase);
+                // Waveform synthesis dispatched by sound type.
+                // Sticks: 30% high-freq triangle tone + 70% noise burst, both under envelope.
+                let s = match sound {
+                    1 => sine_sample(phase),                              // woodblock: pure sine
+                    2 => triangle_sample(phase) * 0.3 + noise_f * 0.7,  // sticks: tone + noise
+                    _ => triangle_sample(phase),                          // beep: triangle
+                };
                 let output = s * gain;
 
                 // Advance phase — subtraction avoids float division (RESEARCH.md anti-pattern)
                 let mut new_phase = phase + std::ptr::addr_of!(PHASE_INC).read();
-                if new_phase >= 1.0 {
-                    new_phase -= 1.0;
-                }
+                if new_phase >= 1.0 { new_phase -= 1.0; }
                 std::ptr::addr_of_mut!(PHASE_ACCUM).write(new_phase);
 
                 // Advance envelope — multiplicative decay persists across quanta (Pitfall 1)
-                let new_gain = gain * std::ptr::addr_of!(DECAY_COEFF).read();
+                let new_gain = gain * decay;
                 std::ptr::addr_of_mut!(ENVELOPE_GAIN).write(new_gain);
                 if new_gain < SILENCE_THRESHOLD {
                     std::ptr::addr_of_mut!(ACTIVE).write(false);
@@ -109,13 +146,10 @@ pub extern "C" fn fill_output_buffer(sample_offset: u32, voice: u32, noise_gain:
             } else {
                 0.0_f32
             };
-            // D-10: Unconditional noise mixing — PRNG runs every sample regardless of voice
-            // or whether a click is active. Multiplication by 0.0 (IEEE 754 exact) produces
-            // silence at noise_gain=0.0 with no conditional branch in the hot path (D-12).
-            let raw_noise = xorshift32_next();
-            let noise_sample = (raw_noise as i32 as f32) / 2147483648.0_f32 * noise_gain;
+
+            // Background noise (user slider). Multiplication by 0.0 is exact IEEE 754 — no branch.
             // T-04-02: Clamp prevents clipping when accent click + 100% noise coincide.
-            let mixed = (sample + noise_sample).clamp(-1.0_f32, 1.0_f32);
+            let mixed = (sample + noise_f * noise_gain).clamp(-1.0_f32, 1.0_f32);
             ptr.add(i).write(mixed);
         }
     }
@@ -133,7 +167,18 @@ pub extern "C" fn init(sample_rate: f32) {
         let decay_samples = (DECAY_MS / 1000.0) * sample_rate;
         let decay_coeff = (-1.0_f32 / decay_samples).exp();
         std::ptr::addr_of_mut!(DECAY_COEFF).write(decay_coeff);
+        let wood_samples = (WOOD_DECAY_MS / 1000.0) * sample_rate;
+        std::ptr::addr_of_mut!(DECAY_COEFF_WOOD).write((-1.0_f32 / wood_samples).exp());
+        let stick_samples = (STICK_DECAY_MS / 1000.0) * sample_rate;
+        std::ptr::addr_of_mut!(DECAY_COEFF_STICK).write((-1.0_f32 / stick_samples).exp());
     }
+}
+
+/// Sets the global click sound type. Called by the AudioWorklet on user selection.
+/// 0 = beep (triangle wave, 12ms), 1 = woodblock (sine, 7ms), 2 = sticks (noise+tone, 5ms).
+#[no_mangle]
+pub extern "C" fn set_click_sound(sound: u32) {
+    unsafe { std::ptr::addr_of_mut!(CLICK_SOUND).write(sound); }
 }
 
 /// Sets accent voice DSP parameters. Called by the AudioWorklet when accent settings change.

@@ -199,6 +199,12 @@ export class AudioEngine {
     }
   }
 
+  setClickSound(sound: number): void {
+    if (this._workletNode) {
+      this._workletNode.port.postMessage({ type: 'set-click-sound', sound });
+    }
+  }
+
   setNoiseGain(millis: number): void {
     this._pendingNoiseGainMillis = millis;
     if (this._paramBuffer) {

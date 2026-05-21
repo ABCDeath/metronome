@@ -17,6 +17,14 @@
   // numerator tracked separately for the number input (time sig numerator 1–32).
   let numerator = $state(4)
 
+  // Click sound selector: 0=Beep, 1=Woodblock, 2=Sticks.
+  let clickSound = $state(0)
+
+  function onClickSoundChange(sound: number) {
+    clickSound = sound
+    engine.setClickSound(sound)
+  }
+
   // Noise level state (0–100 integer, maps to 0–1000 millis for setNoiseGain).
   let noiseLevel = $state(0)
 
@@ -213,6 +221,24 @@
             type="button"
             class="subdiv-option {pattern.tracks[0].subdivision === opt.value ? 'selected' : ''}"
             onclick={() => onSubdivisionChange(opt.value as Subdivision)}
+          >{opt.label}</button>
+        {/each}
+      </div>
+    </div>
+
+    <!-- Sound Section -->
+    <div class="section">
+      <h2>Sound</h2>
+      <div class="subdiv-group" role="group">
+        {#each ([
+          { value: 0, label: 'Beep' },
+          { value: 1, label: 'Woodblock' },
+          { value: 2, label: 'Sticks' },
+        ] as const) as opt}
+          <button
+            type="button"
+            class="subdiv-option {clickSound === opt.value ? 'selected' : ''}"
+            onclick={() => onClickSoundChange(opt.value)}
           >{opt.label}</button>
         {/each}
       </div>
