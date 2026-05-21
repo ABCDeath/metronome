@@ -44,7 +44,7 @@ created: 2026-05-21
 | 4-01-04 | 01 | 1 | AUDIO-02 | — | N/A | unit | `cargo test --manifest-path rust/Cargo.toml -- test_clamp_prevents_clipping` | ❌ W0 | ⬜ pending |
 | 4-02-01 | 02 | 2 | AUDIO-02 | — | N/A | integration | `npx vitest run` (TypeScript compiles) | ✅ exists | ⬜ pending |
 | 4-03-01 | 03 | 1 | PATTERN-01 | — | N/A | unit | `npx vitest run src/lib/pattern.test.ts -- --testNamePattern "rebuildBeats merge"` | ❌ W0 | ⬜ pending |
-| 4-03-02 | 03 | 1 | PATTERN-01 | — | N/A | unit | `npx vitest run src/lib/pattern.test.ts -- --testNamePattern "voice cycle"` | ❌ W0 | ⬜ pending |
+| 4-03-02 | 03 | 1 | PATTERN-01 | — | N/A | human | Covered by 04-04 T3 human-verify checkpoint (cycleBeatVoice is a one-liner in App.svelte; no unit test needed) | N/A | ⬜ pending |
 | 4-04-01 | 04 | 3 | PATTERN-01 + AUDIO-02 | — | N/A | human | Manual browser verify — beat grid interaction + noise slider audible | N/A | ⬜ pending |
 
 *Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*

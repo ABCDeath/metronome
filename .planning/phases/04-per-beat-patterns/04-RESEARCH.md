@@ -576,7 +576,7 @@ this._exports.fill_output_buffer(sampleOffset, voice, noiseGainMillis / 1000.0);
 
 ---
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **Where should the noise slider write happen — via `AudioEngine.setNoiseGain()` or direct `Atomics.store` from App.svelte?**
    - What we know: `updatePattern()` already guards all paramSAB writes. The noise slider does not need to go through PatternState (it's not a beat pattern property — it's a mix control).
