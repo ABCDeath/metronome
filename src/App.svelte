@@ -562,6 +562,7 @@
   /* Beat grid — 2D layout (subdivisions): columns = beats, rows = subdivisions */
   .beat-grid-2d {
     display: grid;
+    width: fit-content;
     row-gap: 4px;
     column-gap: 10px;
     overflow-x: auto;
