@@ -46,6 +46,13 @@
     updateAccentParams()
   })
 
+  function handleKeydown(e: KeyboardEvent) {
+    if (e.code === 'Space' && e.target === document.body) {
+      e.preventDefault()
+      handlePlayStop()
+    }
+  }
+
   async function handlePlayStop() {
     if (engine.state === 'stopped') {
       // This click handler IS the user gesture — AudioContext is created inside start() (D-12).
@@ -140,6 +147,8 @@
     engine.setNoiseGain(Math.round(noiseLevel * 0.25))
   }
 </script>
+
+<svelte:window onkeydown={handleKeydown} />
 
 <main>
   <h1>Metronome</h1>
