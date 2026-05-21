@@ -44,6 +44,12 @@ export class AudioEngine {
     // Create AudioContext only on the first call to start() — satisfies user gesture gate (D-12).
     if (!this._audioCtx) {
       this._audioCtx = new AudioContext({ latencyHint: 'interactive' });
+      // Auto-recover from browser-initiated suspension (e.g. tab backgrounded for 10+ minutes).
+      this._audioCtx.addEventListener('statechange', () => {
+        if (this._audioCtx?.state === 'suspended' && this._state === 'running') {
+          this._audioCtx.resume().catch(() => {});
+        }
+      });
     }
 
     // Resume if the context was suspended (e.g., auto-suspended by browser autoplay policy).

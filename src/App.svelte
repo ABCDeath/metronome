@@ -14,7 +14,7 @@
   // PatternState: full timing + accent state, drives engine via $effect (D-06).
   let pattern = $state<PatternState>(defaultPatternState())
 
-  // numerator tracked separately for the number input (time sig numerator 1–12).
+  // numerator tracked separately for the number input (time sig numerator 1–32).
   let numerator = $state(4)
 
   // Noise level state (0–100 integer, maps to 0–1000 millis for setNoiseGain).
@@ -84,7 +84,7 @@
     const input = e.target as HTMLInputElement
     const val = parseInt(input.value, 10)
     if (!isNaN(val)) {
-      numerator = Math.max(1, Math.min(12, val))
+      numerator = Math.max(1, Math.min(32, val))
     }
     input.value = String(numerator)
     onTimeSigChange()
@@ -176,7 +176,7 @@
           type="number"
           class="num-input"
           min="1"
-          max="12"
+          max="32"
           step="1"
           value={numerator}
           onchange={onNumeratorInput}
