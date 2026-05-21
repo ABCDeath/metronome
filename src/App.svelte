@@ -42,7 +42,7 @@
       // P3-04 safety: write accent params after SAB is initialized.
       engine.updatePattern(pattern)
       // Replay noise slider value — SAB is now ready (audio-engine also replays _pendingNoiseGainMillis).
-      engine.setNoiseGain(Math.round(noiseLevel * 10))
+      engine.setNoiseGain(Math.round(noiseLevel * 0.25))
     } else {
       await engine.stop()
     }
@@ -126,7 +126,7 @@
 
   function onNoiseInput(e: Event) {
     noiseLevel = parseInt((e.target as HTMLInputElement).value, 10)
-    engine.setNoiseGain(Math.round(noiseLevel * 10))
+    engine.setNoiseGain(Math.round(noiseLevel * 0.25))
   }
 </script>
 
