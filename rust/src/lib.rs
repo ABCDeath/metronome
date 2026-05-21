@@ -12,6 +12,7 @@ static mut DECAY_COEFF: f32 = 0.0;      // set in init() = exp(-1 / decay_sample
 static mut ACTIVE: bool = false;         // is the click envelope currently running?
 static mut ACCENT_FREQ: f32 = 1400.0;   // D-02: 1400 Hz accent vs 1000 Hz normal
 static mut ACCENT_AMP: f32 = 1.3;       // D-03: default 1.3× multiplier (both toggles on)
+static mut PRNG_STATE: u32 = 12345;     // D-12: xorshift32 seed — must be non-zero
 
 const CLICK_FREQ: f32 = 1000.0;         // D-01: 1000 Hz warm click
 const DECAY_MS: f32 = 12.0;             // D-02: 12ms (midpoint of 10–15ms range)
@@ -35,30 +36,48 @@ fn triangle_sample(phase: f32) -> f32 {
     (phase - 0.5).abs() * 4.0 - 1.0
 }
 
+/// xorshift32 PRNG — Marsaglia (2003) canonical shift triple (13, 17, 5).
+/// Produces uniform pseudo-random u32 values for white noise generation.
+/// PRNG_STATE must be non-zero; seed 12345 satisfies this invariant (D-12).
+#[inline(always)]
+unsafe fn xorshift32_next() -> u32 {
+    let mut state = std::ptr::addr_of!(PRNG_STATE).read();
+    state ^= state << 13;
+    state ^= state >> 17;
+    state ^= state << 5;
+    std::ptr::addr_of_mut!(PRNG_STATE).write(state);
+    state
+}
+
 /// Called every AudioWorklet process() callback (128 samples per call).
 /// sample_offset: sample within this quantum where the click starts (0–127),
 ///                or NO_BEAT_SENTINEL (0xFF) if no beat fires this quantum.
 /// voice:         voice type (0=normal click, 1=accent click).
 /// _noise_gain:   white noise mix level (unused until Phase 3).
 #[no_mangle]
-pub extern "C" fn fill_output_buffer(sample_offset: u32, voice: u32, _noise_gain: f32) {
+pub extern "C" fn fill_output_buffer(sample_offset: u32, voice: u32, noise_gain: f32) {
     // SAFETY: Single-threaded WASM; no concurrent mutation possible.
     unsafe {
         let ptr = std::ptr::addr_of_mut!(AUDIO_OUT) as *mut f32;
 
         // Trigger: arm envelope if a beat fires this quantum (T-02-01: sentinel guards OOB).
         if sample_offset != NO_BEAT_SENTINEL {
-            let (freq, base_amp) = if voice == 1 {
-                (std::ptr::addr_of!(ACCENT_FREQ).read(),
-                 std::ptr::addr_of!(ACCENT_AMP).read())
+            if voice == 2 {
+                // D-14: Silent voice — beat event fires (bar position advances) but no click
+                // synthesis. ACTIVE is not set. Noise mixing still runs unconditionally below.
             } else {
-                (CLICK_FREQ, 0.75_f32)
-            };
-            // Always set PHASE_INC on every trigger (Pitfall P3-03: must restore normal freq)
-            std::ptr::addr_of_mut!(PHASE_INC).write(freq / std::ptr::addr_of!(SAMPLE_RATE).read());
-            std::ptr::addr_of_mut!(ENVELOPE_GAIN).write(base_amp);
-            std::ptr::addr_of_mut!(PHASE_ACCUM).write(0.0_f32);
-            std::ptr::addr_of_mut!(ACTIVE).write(true);
+                let (freq, base_amp) = if voice == 1 {
+                    (std::ptr::addr_of!(ACCENT_FREQ).read(),
+                     std::ptr::addr_of!(ACCENT_AMP).read())
+                } else {
+                    (CLICK_FREQ, 0.75_f32)
+                };
+                // Always set PHASE_INC on every trigger (Pitfall P3-03: must restore normal freq)
+                std::ptr::addr_of_mut!(PHASE_INC).write(freq / std::ptr::addr_of!(SAMPLE_RATE).read());
+                std::ptr::addr_of_mut!(ENVELOPE_GAIN).write(base_amp);
+                std::ptr::addr_of_mut!(PHASE_ACCUM).write(0.0_f32);
+                std::ptr::addr_of_mut!(ACTIVE).write(true);
+            }
         }
 
         for i in 0..128_usize {
@@ -90,7 +109,14 @@ pub extern "C" fn fill_output_buffer(sample_offset: u32, voice: u32, _noise_gain
             } else {
                 0.0_f32
             };
-            ptr.add(i).write(sample);
+            // D-10: Unconditional noise mixing — PRNG runs every sample regardless of voice
+            // or whether a click is active. Multiplication by 0.0 (IEEE 754 exact) produces
+            // silence at noise_gain=0.0 with no conditional branch in the hot path (D-12).
+            let raw_noise = xorshift32_next();
+            let noise_sample = (raw_noise as i32 as f32) / 2147483648.0_f32 * noise_gain;
+            // T-04-02: Clamp prevents clipping when accent click + 100% noise coincide.
+            let mixed = (sample + noise_sample).clamp(-1.0_f32, 1.0_f32);
+            ptr.add(i).write(mixed);
         }
     }
 }
@@ -374,5 +400,75 @@ mod tests {
         assert_eq!(4 % 4, 0);
         assert_eq!(7 % 4, 3);
         assert_eq!(100 % 4, 0);
+    }
+
+    // --- Phase 4: silent voice, noise mixing, clamp tests ---
+
+    #[test]
+    fn test_silent_voice_no_click() {
+        // fill_output_buffer(0, 2, 0.0) with ACTIVE=false → all 128 samples are 0.0
+        // Voice 2 = silent: no envelope triggered, no ACTIVE set. noise_gain=0.0 → no noise.
+        unsafe {
+            init(44100.0);
+            std::ptr::addr_of_mut!(ACTIVE).write(false);
+            fill_output_buffer(0, 2, 0.0);
+            for i in 0..128_usize {
+                let s = read_out(i);
+                assert_eq!(s, 0.0_f32,
+                    "sample {} should be 0.0 for silent voice + zero noise, got {}", i, s);
+            }
+        }
+    }
+
+    #[test]
+    fn test_noise_produces_output() {
+        // fill_output_buffer(NO_BEAT_SENTINEL, 0, 1.0) with ACTIVE=false and deterministic PRNG
+        // → at least one of the 128 output samples is non-zero.
+        // Proves xorshift32 produces non-zero values at seed 12345 (Pitfall 2: zero seed = silence).
+        unsafe {
+            init(44100.0);
+            std::ptr::addr_of_mut!(ACTIVE).write(false);
+            // Reset PRNG to known non-zero seed for deterministic test outcome.
+            std::ptr::addr_of_mut!(PRNG_STATE).write(12345);
+            fill_output_buffer(NO_BEAT_SENTINEL, 0, 1.0);
+            let any_nonzero = (0..128_usize).any(|i| read_out(i) != 0.0_f32);
+            assert!(any_nonzero,
+                "At least one sample should be non-zero with noise_gain=1.0 and active PRNG");
+        }
+    }
+
+    #[test]
+    fn test_noise_zero_gain() {
+        // fill_output_buffer(NO_BEAT_SENTINEL, 0, 0.0) with ACTIVE=false → all 128 samples = 0.0
+        // When noise_gain is 0.0 and no click is active, IEEE 754 multiplication by 0.0 is
+        // exactly 0.0 — confirming digital silence with no branch in the hot path (D-12).
+        unsafe {
+            init(44100.0);
+            std::ptr::addr_of_mut!(ACTIVE).write(false);
+            fill_output_buffer(NO_BEAT_SENTINEL, 0, 0.0);
+            for i in 0..128_usize {
+                let s = read_out(i);
+                assert_eq!(s, 0.0_f32,
+                    "sample {} should be 0.0 with noise_gain=0.0 and ACTIVE=false, got {}", i, s);
+            }
+        }
+    }
+
+    #[test]
+    fn test_clamp_prevents_clipping() {
+        // fill_output_buffer(0, 1, 1.0) with ACTIVE=false — accent click (voice=1) + 100% noise.
+        // Worst-case additive mix: peak click ~1.3 + peak noise ~1.0 = ~2.3 before clamp.
+        // The per-sample clamp(-1.0, 1.0) must prevent any sample from exceeding [-1.0, 1.0].
+        unsafe {
+            init(44100.0);
+            std::ptr::addr_of_mut!(ACTIVE).write(false);
+            std::ptr::addr_of_mut!(PRNG_STATE).write(12345);
+            fill_output_buffer(0, 1, 1.0);
+            for i in 0..128_usize {
+                let s = read_out(i);
+                assert!(s >= -1.0_f32 && s <= 1.0_f32,
+                    "sample {} = {} is outside [-1.0, 1.0] — clamp failed", i, s);
+            }
+        }
     }
 }
