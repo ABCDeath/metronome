@@ -84,6 +84,48 @@ describe('rebuildBeats', () => {
       expect(beats[i].voice).toBe(0)
     }
   })
+
+  describe('with existingBeats', () => {
+    it('grow 4→8: preserves existing voices and fills new positions with 0', () => {
+      const existing = [{ voice: 1 }, { voice: 2 }, { voice: 0 }, { voice: 0 }]
+      const result = rebuildBeats(8, existing)
+      expect(result.length).toBe(8)
+      expect(result[0].voice).toBe(1)
+      expect(result[1].voice).toBe(2)
+      expect(result[2].voice).toBe(0)
+      expect(result[3].voice).toBe(0)
+      expect(result[4].voice).toBe(0)
+      expect(result[7].voice).toBe(0)
+    })
+
+    it('shrink 8→2: truncates from the right', () => {
+      const existing = [
+        { voice: 1 }, { voice: 2 }, { voice: 0 }, { voice: 0 },
+        { voice: 1 }, { voice: 0 }, { voice: 0 }, { voice: 1 },
+      ]
+      const result = rebuildBeats(2, existing)
+      expect(result.length).toBe(2)
+      expect(result[0].voice).toBe(1)
+      expect(result[1].voice).toBe(2)
+    })
+
+    it('same size: copies all voice assignments unchanged', () => {
+      const existing = [{ voice: 1 }, { voice: 2 }, { voice: 0 }, { voice: 0 }]
+      const result = rebuildBeats(4, existing)
+      expect(result.length).toBe(4)
+      expect(result[0].voice).toBe(1)
+      expect(result[1].voice).toBe(2)
+      expect(result[2].voice).toBe(0)
+      expect(result[3].voice).toBe(0)
+    })
+
+    it('fresh init (no existingBeats) still returns Phase 3 default', () => {
+      const result = rebuildBeats(4)
+      expect(result[0].voice).toBe(1)
+      expect(result[1].voice).toBe(0)
+      expect(result[3].voice).toBe(0)
+    })
+  })
 })
 
 // ---------------------------------------------------------------------------

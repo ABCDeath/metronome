@@ -51,11 +51,24 @@ export function computeStepInterval(
 }
 
 /**
- * Build a fresh beats array of length stepCount.
- * Step 0 is the downbeat (voice=1), all others are normal (voice=0).
+ * Build a beats array of length stepCount.
+ *
+ * Without existingBeats: returns Phase 3 default — step 0 is the downbeat
+ * (voice=1), all others are normal (voice=0).
+ *
+ * With existingBeats: merges existing voice assignments into the new length.
+ * Positions within existingBeats.length copy the existing voice; positions
+ * beyond existingBeats.length fill with Normal (voice=0). When stepCount is
+ * less than existingBeats.length, Array.from implicitly truncates from the
+ * right. The input existingBeats array is never mutated.
  */
-export function rebuildBeats(stepCount: number): BeatPosition[] {
-  return Array.from({ length: stepCount }, (_, i) => ({ voice: i === 0 ? 1 : 0 }));
+export function rebuildBeats(stepCount: number, existingBeats?: BeatPosition[]): BeatPosition[] {
+  if (!existingBeats) {
+    return Array.from({ length: stepCount }, (_, i) => ({ voice: i === 0 ? 1 : 0 }));
+  }
+  return Array.from({ length: stepCount }, (_, i) => ({
+    voice: i < existingBeats.length ? existingBeats[i].voice : 0,
+  }));
 }
 
 /**
