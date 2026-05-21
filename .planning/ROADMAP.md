@@ -145,7 +145,16 @@ Plans:
   3. The production deployment (Netlify or Cloudflare Pages) serves COOP/COEP headers; `crossOriginIsolated === true` confirmed in a Playwright E2E test running against the production URL.
   4. `AudioContext.sampleRate` is read at runtime and passed to WASM at init; the engine produces correct timing at 44100 Hz (macOS default) and 48000 Hz (Android default) without manual reconfiguration.
 
-**Plans:** TBD
+**Plans:** 2 plans
+
+Plans:
+**Wave 1**
+
+- [ ] 05-01-PLAN.md — CI build infrastructure: build.sh, public/_headers, rust-toolchain.toml for Cloudflare Pages deployment
+
+**Wave 2** *(blocked on 05-01 + successful Cloudflare Pages deploy)*
+
+- [ ] 05-02-PLAN.md — Android hardware validation: manual checklist, Cloudflare Pages deploy, USB remote debug Performance audit
 
 ## Progress
 
@@ -158,4 +167,4 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 | 2. First Click | 2/2 | Complete   | 2026-05-19 |
 | 3. Timing Controls | 4/4 | Complete | 2026-05-20 |
 | 4. Per-Beat Patterns and White Noise | 1/4 | In Progress|  |
-| 5. Cross-Platform Validation | 0/TBD | Not started | - |
+| 5. Cross-Platform Validation | 0/2 | Not started | - |
