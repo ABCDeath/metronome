@@ -20,6 +20,9 @@
   // Noise level state (0–100 integer, maps to 0–1000 millis for setNoiseGain).
   let noiseLevel = $state(0)
 
+  // Subdivisions per beat — drives 2D grid layout.
+  const subdivPerBeat = $derived(SUBDIV_MULT[pattern.tracks[0].subdivision] ?? 1)
+
   // Accent toggle state (D-02, D-03): both default on.
   let accentPitchOn = $state(true)
   let accentAmpOn = $state(true)
@@ -218,19 +221,46 @@
     <!-- Pattern Section -->
     <div class="section">
       <h2>Pattern</h2>
-      <div class="beat-grid" role="group" aria-label="Beat pattern">
-        {#each pattern.tracks[0].beats as beat, i}
-          {@const voiceLabel = beat.voice === 1 ? 'A' : beat.voice === 2 ? '\u2014' : 'N'}
-          {@const voiceState = beat.voice === 1 ? 'Accent' : beat.voice === 2 ? 'Silent' : 'Normal'}
-          {@const voiceClass = beat.voice === 1 ? 'beat-cell-accent' : beat.voice === 2 ? 'beat-cell-silent' : 'beat-cell-normal'}
-          <button
-            type="button"
-            class="beat-cell {voiceClass}"
-            onclick={() => cycleBeatVoice(i)}
-            aria-label="Beat {i + 1}: {voiceState}"
-          >{voiceLabel}</button>
-        {/each}
-      </div>
+      {#if subdivPerBeat === 1}
+        <!-- Single-row layout for quarter notes -->
+        <div class="beat-grid" role="group" aria-label="Beat pattern">
+          {#each pattern.tracks[0].beats as beat, i}
+            {@const voiceLabel = beat.voice === 1 ? 'A' : beat.voice === 2 ? '\u2014' : 'N'}
+            {@const voiceState = beat.voice === 1 ? 'Accent' : beat.voice === 2 ? 'Silent' : 'Normal'}
+            {@const voiceClass = beat.voice === 1 ? 'beat-cell-accent' : beat.voice === 2 ? 'beat-cell-silent' : 'beat-cell-normal'}
+            <button
+              type="button"
+              class="beat-cell {voiceClass}"
+              onclick={() => cycleBeatVoice(i)}
+              aria-label="Beat {i + 1}: {voiceState}"
+            >{voiceLabel}</button>
+          {/each}
+        </div>
+      {:else}
+        <!-- 2D grid layout: columns = beats, rows = subdivisions per beat -->
+        <div
+          class="beat-grid-2d"
+          role="group"
+          aria-label="Beat pattern"
+          style="grid-template-columns: repeat({numerator}, auto)"
+        >
+          {#each Array.from({length: subdivPerBeat}, (_, r) => r) as row}
+            {#each Array.from({length: numerator}, (_, c) => c) as col}
+              {@const i = col * subdivPerBeat + row}
+              {@const beat = pattern.tracks[0].beats[i]}
+              {@const voiceLabel = beat.voice === 1 ? 'A' : beat.voice === 2 ? '\u2014' : 'N'}
+              {@const voiceState = beat.voice === 1 ? 'Accent' : beat.voice === 2 ? 'Silent' : 'Normal'}
+              {@const voiceClass = beat.voice === 1 ? 'beat-cell-accent' : beat.voice === 2 ? 'beat-cell-silent' : 'beat-cell-normal'}
+              <button
+                type="button"
+                class="beat-cell {voiceClass}"
+                onclick={() => cycleBeatVoice(i)}
+                aria-label="Beat {col + 1} sub {row + 1}: {voiceState}"
+              >{voiceLabel}</button>
+            {/each}
+          {/each}
+        </div>
+      {/if}
     </div>
 
     <!-- Accent Section -->
@@ -521,11 +551,19 @@
     left: 18px;
   }
 
-  /* Beat grid */
+  /* Beat grid — single row (quarter notes) */
   .beat-grid {
     display: flex;
     flex-wrap: nowrap;
     gap: 4px;
+    overflow-x: auto;
+  }
+
+  /* Beat grid — 2D layout (subdivisions): columns = beats, rows = subdivisions */
+  .beat-grid-2d {
+    display: grid;
+    row-gap: 4px;
+    column-gap: 10px;
     overflow-x: auto;
   }
 
