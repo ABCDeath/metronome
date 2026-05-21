@@ -20,6 +20,7 @@ export class AudioEngine {
   private _controlRingIndices: Int32Array | null = null;
   private _controlRingData: Uint32Array | null = null;
   private _paramBuffer: Int32Array | null = null;          // Int32Array view over _paramSAB
+  private _pendingNoiseGainMillis: number = 0;
   private _stepInterval: number = 60.0 / 120;             // seconds per step (recomputed by updatePattern)
   private _beats: BeatPosition[] = [{ voice: 1 }, { voice: 0 }, { voice: 0 }, { voice: 0 }];
   private _stepCount: number = 4;
@@ -74,6 +75,9 @@ export class AudioEngine {
       this._controlRingIndices = new Int32Array(this._controlRingSAB, 0, 2);
       this._controlRingData = new Uint32Array(this._controlRingSAB, 8, 256);
       this._paramBuffer = new Int32Array(this._paramSAB, 0, 8);
+      if (this._pendingNoiseGainMillis > 0) {
+        Atomics.store(this._paramBuffer, 4, this._pendingNoiseGainMillis);
+      }
 
       // Pass the compiled WebAssembly.Module via processorOptions (D-07).
       // WebAssembly.Module is serializable via structured clone — no postMessage needed.
@@ -186,6 +190,13 @@ export class AudioEngine {
         freqHz: accentFreqHz,
         amp: accentAmpMillis / 1000.0,
       });
+    }
+  }
+
+  setNoiseGain(millis: number): void {
+    this._pendingNoiseGainMillis = millis;
+    if (this._paramBuffer) {
+      Atomics.store(this._paramBuffer, 4, millis);
     }
   }
 

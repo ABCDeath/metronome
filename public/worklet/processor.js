@@ -80,7 +80,7 @@ class MetronomeProcessor extends AudioWorkletProcessor {
     // Guard: _ringIndices arrives via "init-buffers" message, which is async from _ready.
     // Both must be set before Atomics.load — a missing _ringIndices would throw TypeError
     // and kill the processor permanently (CR-01).
-    if (!this._ready || !this._ringIndices) {
+    if (!this._ready || !this._ringIndices || !this._paramBuffer) {
       return true;
     }
 
@@ -110,8 +110,12 @@ class MetronomeProcessor extends AudioWorkletProcessor {
       // evQuantum > myQuantum: leave in ring for a future quantum (do nothing)
     }
 
+    // Read noise gain from paramSAB slot 4 — fresh every frame (slider can change any time).
+    const noiseGainMillis = Atomics.load(this._paramBuffer, 4);
+    const noiseGain = noiseGainMillis / 1000.0;
+
     // Call fill_output_buffer with 3 args per D-05 (updated from Phase 1 2-arg stub).
-    this._exports.fill_output_buffer(sampleOffset, voice, 0.0);
+    this._exports.fill_output_buffer(sampleOffset, voice, noiseGain);
 
     // Copy 128 f32 samples from WASM linear memory to the output buffer.
     // outputs[0][0] is the mono output channel Float32Array.
