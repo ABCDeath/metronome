@@ -2,9 +2,9 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: complete
-stopped_at: ""
-last_updated: "2026-05-21T18:30:00.000Z"
+status: completed
+stopped_at: context exhaustion at 75% (2026-05-22)
+last_updated: "2026-05-22T06:10:12.820Z"
 last_activity: 2026-05-21 -- Phase 05 complete; PLATFORM-02 verified on Android 16; production live on Cloudflare Pages
 progress:
   total_phases: 5
@@ -82,6 +82,12 @@ Recent decisions affecting current work:
 - [Phase ?]: Optional existingBeats param in rebuildBeats() enables preserve-on-resize semantics — backwards-compatible; all Phase 3 callers unaffected
 - [Phase ?]: Array.from implicit truncation for shrink case — no explicit slice; length bound handles it cleanly
 
+### Quick Tasks Completed
+
+| Task | Date | Files Changed |
+|------|------|---------------|
+| Add ghost notes (voice=3, 30% amp) | 2026-05-22 | rust/src/lib.rs, src/App.svelte, public/wasm/ |
+
 ### Pending Todos
 
 None.
@@ -104,7 +110,7 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-05-21T12:29:42.757Z
-Stopped at: context exhaustion at 75% (2026-05-21)
+Last session: 2026-05-22T06:10:12.812Z
+Stopped at: context exhaustion at 75% (2026-05-22)
 Resume file: None
 Next: Phase 4 — Per-Beat Patterns and White Noise

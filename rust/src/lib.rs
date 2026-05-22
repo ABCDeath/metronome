@@ -89,12 +89,15 @@ pub extern "C" fn fill_output_buffer(sample_offset: u32, voice: u32, noise_gain:
                 // Always set PHASE_INC on every trigger (Pitfall P3-03: must restore normal freq).
                 // Freq and base amplitude depend on sound type and voice.
                 let (freq, base_amp) = match (sound, voice) {
-                    (0, 1) => (accent_freq,     accent_amp), // beep accent
-                    (0, _) => (CLICK_FREQ,       0.75_f32),  // beep normal
-                    (1, 1) => (WOOD_ACCENT_FREQ, accent_amp), // woodblock accent
-                    (1, _) => (WOOD_CLICK_FREQ,  0.85_f32),  // woodblock normal
-                    (_, 1) => (STICK_CLICK_FREQ, accent_amp), // sticks accent
-                    _      => (STICK_CLICK_FREQ, 0.85_f32),  // sticks normal
+                    (0, 1) => (accent_freq,     accent_amp),        // beep accent
+                    (0, 3) => (CLICK_FREQ,       0.75_f32 * 0.3),  // beep ghost
+                    (0, _) => (CLICK_FREQ,       0.75_f32),         // beep normal
+                    (1, 1) => (WOOD_ACCENT_FREQ, accent_amp),       // woodblock accent
+                    (1, 3) => (WOOD_CLICK_FREQ,  0.85_f32 * 0.3),  // woodblock ghost
+                    (1, _) => (WOOD_CLICK_FREQ,  0.85_f32),         // woodblock normal
+                    (_, 1) => (STICK_CLICK_FREQ, accent_amp),       // sticks accent
+                    (_, 3) => (STICK_CLICK_FREQ, 0.85_f32 * 0.3),  // sticks ghost
+                    _      => (STICK_CLICK_FREQ, 0.85_f32),         // sticks normal
                 };
                 std::ptr::addr_of_mut!(PHASE_INC).write(freq / std::ptr::addr_of!(SAMPLE_RATE).read());
                 std::ptr::addr_of_mut!(ENVELOPE_GAIN).write(base_amp);
@@ -496,6 +499,33 @@ mod tests {
                 assert_eq!(s, 0.0_f32,
                     "sample {} should be 0.0 with noise_gain=0.0 and ACTIVE=false, got {}", i, s);
             }
+        }
+    }
+
+    #[test]
+    fn test_ghost_amplitude_lower_than_normal() {
+        // Ghost voice (voice=3) must produce lower peak amplitude than normal (voice=0).
+        unsafe {
+            init(44100.0);
+            set_accent_params(1400.0, 1.3);
+
+            // Ghost trigger: record peak amplitude
+            std::ptr::addr_of_mut!(ACTIVE).write(false);
+            fill_output_buffer(0, 3, 0.0);
+            let ghost_peak = (0..128_usize)
+                .map(|i| read_out(i).abs())
+                .fold(0.0_f32, f32::max);
+
+            // Normal trigger: record peak amplitude
+            std::ptr::addr_of_mut!(ACTIVE).write(false);
+            fill_output_buffer(0, 0, 0.0);
+            let normal_peak = (0..128_usize)
+                .map(|i| read_out(i).abs())
+                .fold(0.0_f32, f32::max);
+
+            assert!(ghost_peak > 0.0, "Ghost should produce non-zero output");
+            assert!(ghost_peak < normal_peak,
+                "Ghost peak ({}) must be lower than normal peak ({})", ghost_peak, normal_peak);
         }
     }
 

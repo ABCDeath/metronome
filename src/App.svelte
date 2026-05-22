@@ -135,9 +135,9 @@
   // --- Beat grid helpers ---
 
   function cycleBeatVoice(i: number) {
-    // Cycle voice 0 (Normal) → 1 (Accent) → 2 (Silent) → 0.
+    // Cycle voice 0 (Normal) → 1 (Accent) → 2 (Silent) → 3 (Ghost) → 0.
     // Direct property mutation on Svelte 5 $state proxy triggers $effect → engine.updatePattern().
-    pattern.tracks[0].beats[i].voice = (pattern.tracks[0].beats[i].voice + 1) % 3
+    pattern.tracks[0].beats[i].voice = (pattern.tracks[0].beats[i].voice + 1) % 4
   }
 
   // --- Noise helpers ---
@@ -260,9 +260,9 @@
         <!-- Single-row layout for quarter notes -->
         <div class="beat-grid" role="group" aria-label="Beat pattern">
           {#each pattern.tracks[0].beats as beat, i}
-            {@const voiceLabel = beat.voice === 1 ? 'A' : beat.voice === 2 ? '\u2014' : 'N'}
-            {@const voiceState = beat.voice === 1 ? 'Accent' : beat.voice === 2 ? 'Silent' : 'Normal'}
-            {@const voiceClass = beat.voice === 1 ? 'beat-cell-accent' : beat.voice === 2 ? 'beat-cell-silent' : 'beat-cell-normal'}
+            {@const voiceLabel = beat.voice === 1 ? 'A' : beat.voice === 2 ? '\u2014' : beat.voice === 3 ? 'G' : 'N'}
+            {@const voiceState = beat.voice === 1 ? 'Accent' : beat.voice === 2 ? 'Silent' : beat.voice === 3 ? 'Ghost' : 'Normal'}
+            {@const voiceClass = beat.voice === 1 ? 'beat-cell-accent' : beat.voice === 2 ? 'beat-cell-silent' : beat.voice === 3 ? 'beat-cell-ghost' : 'beat-cell-normal'}
             <button
               type="button"
               class="beat-cell {voiceClass}"
@@ -283,9 +283,9 @@
             {#each Array.from({length: numerator}, (_, c) => c) as col}
               {@const i = col * subdivPerBeat + row}
               {@const beat = pattern.tracks[0].beats[i]}
-              {@const voiceLabel = beat.voice === 1 ? 'A' : beat.voice === 2 ? '\u2014' : 'N'}
-              {@const voiceState = beat.voice === 1 ? 'Accent' : beat.voice === 2 ? 'Silent' : 'Normal'}
-              {@const voiceClass = beat.voice === 1 ? 'beat-cell-accent' : beat.voice === 2 ? 'beat-cell-silent' : 'beat-cell-normal'}
+              {@const voiceLabel = beat.voice === 1 ? 'A' : beat.voice === 2 ? '\u2014' : beat.voice === 3 ? 'G' : 'N'}
+              {@const voiceState = beat.voice === 1 ? 'Accent' : beat.voice === 2 ? 'Silent' : beat.voice === 3 ? 'Ghost' : 'Normal'}
+              {@const voiceClass = beat.voice === 1 ? 'beat-cell-accent' : beat.voice === 2 ? 'beat-cell-silent' : beat.voice === 3 ? 'beat-cell-ghost' : 'beat-cell-normal'}
               <button
                 type="button"
                 class="beat-cell {voiceClass}"
@@ -647,6 +647,18 @@
   .beat-cell-silent:hover {
     background: #e0e0e0;
     border-color: #aaaaaa;
+  }
+
+  .beat-cell-ghost {
+    background: #ffffff;
+    color: #aaaaaa;
+    border-color: #aaaaaa;
+    border-style: dashed;
+  }
+
+  .beat-cell-ghost:hover {
+    background: #f5f5f5;
+    border-color: #888888;
   }
 
   /* Noise slider */
