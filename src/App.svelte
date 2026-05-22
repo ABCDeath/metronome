@@ -180,10 +180,12 @@
           onkeydown={(e) => { if (e.key === 'Enter') onBpmInput(e) }}
         />
         <div class="step-buttons">
+          <button type="button" class="step-btn" onclick={() => adjustBpm(-10)}>-10</button>
           <button type="button" class="step-btn" onclick={() => adjustBpm(-5)}>-5</button>
           <button type="button" class="step-btn" onclick={() => adjustBpm(-1)}>-1</button>
           <button type="button" class="step-btn" onclick={() => adjustBpm(1)}>+1</button>
           <button type="button" class="step-btn" onclick={() => adjustBpm(5)}>+5</button>
+          <button type="button" class="step-btn" onclick={() => adjustBpm(10)}>+10</button>
         </div>
       </div>
     </div>
