@@ -360,6 +360,119 @@
       {/if}
     </div>
 
+    <!-- Training Section -->
+    <div class="section">
+      <h2>Training</h2>
+      <!-- Toggle row -->
+      <div class="accent-row">
+        <span class="accent-label">Training mode</span>
+        <input
+          type="checkbox"
+          class="toggle"
+          checked={trainingEnabled}
+          onchange={() => trainingEnabled = !trainingEnabled}
+        />
+      </div>
+
+      {#if trainingEnabled}
+        <!-- Bar count inputs row -->
+        <div class="row" style="margin-top: 12px;">
+          <label>
+            Normal bars
+            <input
+              type="number"
+              class="num-input"
+              min="1"
+              max="32"
+              value={normalBarCount}
+              oninput={onNormalBarCountInput}
+            />
+          </label>
+          <label>
+            Alt bars
+            <input
+              type="number"
+              class="num-input"
+              min="1"
+              max="32"
+              value={altBarCount}
+              oninput={onAltBarCountInput}
+            />
+          </label>
+        </div>
+
+        <!-- Alt type selector -->
+        <div class="subdiv-group" role="group" style="margin-top: 12px;">
+          <button
+            type="button"
+            class="subdiv-option {altType === 'silent' ? 'selected' : ''}"
+            onclick={() => onAltTypeChange('silent')}
+          >Silent</button>
+          <button
+            type="button"
+            class="subdiv-option {altType === 'skips' ? 'selected' : ''}"
+            onclick={() => onAltTypeChange('skips')}
+          >Skips</button>
+        </div>
+
+        {#if altType === 'skips'}
+          <div style="margin-top: 12px;">
+            <p style="margin: 0 0 8px; font-size: 14px; color: #666;">Skips pattern</p>
+            {#if skipsSubdivPerBeat === 1}
+              <!-- Single-row layout for quarter notes -->
+              <div class="beat-grid" role="group" aria-label="Skips beat pattern">
+                {#each skipsPattern.tracks[0].beats as beat, i}
+                  {@const voiceLabel = beat.voice === 1 ? 'A' : beat.voice === 2 ? '\u2014' : beat.voice === 3 ? 'G' : 'N'}
+                  {@const voiceState = beat.voice === 1 ? 'Accent' : beat.voice === 2 ? 'Silent' : beat.voice === 3 ? 'Ghost' : 'Normal'}
+                  {@const voiceClass = beat.voice === 1 ? 'beat-cell-accent' : beat.voice === 2 ? 'beat-cell-silent' : beat.voice === 3 ? 'beat-cell-ghost' : 'beat-cell-normal'}
+                  <button
+                    type="button"
+                    class="beat-cell {voiceClass}"
+                    onclick={() => cycleSkipsBeatVoice(i)}
+                    aria-label="Skips beat {i + 1}: {voiceState}"
+                  >{voiceLabel}</button>
+                {/each}
+              </div>
+            {:else}
+              <!-- 2D grid layout: columns = beats, rows = subdivisions per beat -->
+              <div
+                class="beat-grid-2d"
+                role="group"
+                aria-label="Skips beat pattern"
+                style="grid-template-columns: repeat({numerator}, auto)"
+              >
+                {#each Array.from({length: skipsSubdivPerBeat}, (_, r) => r) as row}
+                  {#each Array.from({length: numerator}, (_, c) => c) as col}
+                    {@const i = col * skipsSubdivPerBeat + row}
+                    {@const beat = skipsPattern.tracks[0].beats[i]}
+                    {@const voiceLabel = beat.voice === 1 ? 'A' : beat.voice === 2 ? '\u2014' : beat.voice === 3 ? 'G' : 'N'}
+                    {@const voiceState = beat.voice === 1 ? 'Accent' : beat.voice === 2 ? 'Silent' : beat.voice === 3 ? 'Ghost' : 'Normal'}
+                    {@const voiceClass = beat.voice === 1 ? 'beat-cell-accent' : beat.voice === 2 ? 'beat-cell-silent' : beat.voice === 3 ? 'beat-cell-ghost' : 'beat-cell-normal'}
+                    <button
+                      type="button"
+                      class="beat-cell {voiceClass}"
+                      onclick={() => cycleSkipsBeatVoice(i)}
+                      aria-label="Skips beat {col + 1} sub {row + 1}: {voiceState}"
+                    >{voiceLabel}</button>
+                  {/each}
+                {/each}
+              </div>
+            {/if}
+          </div>
+        {/if}
+
+        {#if engineState === 'running'}
+          <div class="cycle-strip">
+            {#each Array.from({length: normalBarCount + altBarCount}, (_, i) => i) as i}
+              {@const label = i < normalBarCount ? 'N' : (altType === 'skips' ? 'K' : 'S')}
+              {@const isActive = (currentBarIndex % (normalBarCount + altBarCount)) === i}
+              <span class="cycle-block {isActive ? 'cycle-block-active' : ''}">{label}</span>
+            {/each}
+          </div>
+        {/if}
+      {/if}
+    </div>
+
     <!-- Accent Section -->
     <div class="section">
       <h2>Accent</h2>
@@ -732,5 +845,32 @@
     width: 36px;
     font-size: 14px;
     text-align: right;
+  }
+
+  /* Training mode cycle-strip */
+  .cycle-strip {
+    display: flex;
+    gap: 4px;
+    margin-top: 12px;
+    flex-wrap: wrap;
+  }
+
+  .cycle-block {
+    min-width: 32px;
+    min-height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 2px solid #ccc;
+    border-radius: 4px;
+    font-size: 14px;
+    font-weight: 600;
+    color: #666;
+  }
+
+  .cycle-block-active {
+    background: #333;
+    color: #fff;
+    border-color: #333;
   }
 </style>
