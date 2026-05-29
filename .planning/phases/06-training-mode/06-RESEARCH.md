@@ -567,17 +567,19 @@ function onAltBarCountInput(e: Event) {
 
 ---
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **`skipsPattern` subdivision independence**
    - What we know: `skipsPattern` is a full `PatternState` with its own `subdivision` field. The CONTEXT says all bars share the same BPM, time sig, subdivision, denominator (D-01).
    - What's unclear: Should `skipsPattern.tracks[0].subdivision` be kept in sync with `pattern.tracks[0].subdivision`, or is it safe to leave it at the `defaultPatternState()` default and only sync `stepCount` + `beats`?
    - Recommendation: Sync `subdivision` and `denominator` in `onSubdivisionChange` and `onDenominatorChange` alongside `stepCount` + `beats`. The engine only uses `_altBeats[]` (not the full PatternState), so it doesn't matter for audio correctness, but it keeps `skipsSubdivPerBeat` correct for the 2D grid layout.
+   - RESOLVED: Sync `subdivision` and `denominator` in `onSubdivisionChange` and `onDenominatorChange` alongside `stepCount` + `beats`. Implemented in 06-03 Task 1a.
 
 2. **Bar type during training-disabled playback**
    - What we know: When `trainingEnabled = false`, the engine ignores training state and `_currentBarType` defaults to `'normal'`.
    - What's unclear: What bar type does `onBarTypeChange` report when training is disabled? It should not fire at all.
    - Recommendation: Gate the entire bar-boundary block on `this._trainingEnabled` (Pattern 1 already does this). When training is disabled, `onBarTypeChange` never fires, and `currentBarType` in App.svelte retains its last value from the previous session — harmless since the cycle-strip is hidden when `!trainingEnabled`.
+   - RESOLVED: The entire bar-boundary detection block in `_schedulerTick` is gated on `this._trainingEnabled`. When training is disabled, `onBarTypeChange` never fires. Implemented in 06-02 Task 2.
 
 ---
 
