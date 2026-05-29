@@ -1,5 +1,6 @@
 <script lang="ts">
   import { AudioEngine } from './lib/audio-engine.js'
+  import type { BarType } from './lib/audio-engine.js'
   import type { PatternState, Subdivision } from './lib/pattern.js'
   import { SUBDIV_MULT, rebuildBeats, defaultPatternState } from './lib/pattern.js'
 
@@ -7,9 +8,19 @@
   // AudioContext is only created inside engine.start() on user gesture (D-12).
   let engineState = $state<'stopped' | 'running'>('stopped')
 
-  const engine = new AudioEngine((state) => {
-    engineState = state
-  })
+  // Training mode state — declared BEFORE engine construction (Pitfall 6: closure timing)
+  let trainingEnabled = $state(false)
+  let normalBarCount = $state(2)
+  let altBarCount = $state(2)
+  let altType = $state<'silent' | 'skips'>('silent')
+  let skipsPattern = $state<PatternState>(defaultPatternState())
+  let currentBarType = $state<BarType>('normal')
+  let currentBarIndex = $state(0)
+
+  const engine = new AudioEngine(
+    (state) => { engineState = state },
+    (type, barIndex) => { currentBarType = type; currentBarIndex = barIndex }
+  )
 
   // PatternState: full timing + accent state, drives engine via $effect (D-06).
   let pattern = $state<PatternState>(defaultPatternState())
@@ -31,6 +42,9 @@
   // Subdivisions per beat — drives 2D grid layout.
   const subdivPerBeat = $derived(SUBDIV_MULT[pattern.tracks[0].subdivision] ?? 1)
 
+  // Subdivisions per beat for the skips pattern grid.
+  const skipsSubdivPerBeat = $derived(SUBDIV_MULT[skipsPattern.tracks[0].subdivision] ?? 1)
+
   // Accent toggle state (D-02, D-03): both default on.
   let accentPitchOn = $state(true)
   let accentAmpOn = $state(true)
@@ -45,6 +59,15 @@
   $effect(() => {
     updateAccentParams()
   })
+
+  // $effect: sync training mode enable/disable with engine.
+  $effect(() => { engine.setTrainingMode(trainingEnabled) })
+
+  // $effect: sync training cycle config with engine.
+  $effect(() => { engine.setTrainingConfig(normalBarCount, altBarCount, altType) })
+
+  // $effect: sync skips beat pattern with engine.
+  $effect(() => { engine.setAltBeats(skipsPattern.tracks[0].beats) })
 
   function handleKeydown(e: KeyboardEvent) {
     if (e.code === 'Space' && e.target === document.body) {
@@ -96,6 +119,9 @@
     const stepCount = numerator * subdivMult
     pattern.tracks[0].stepCount = stepCount
     pattern.tracks[0].beats = rebuildBeats(stepCount, pattern.tracks[0].beats)
+    // Keep skipsPattern in sync with time sig changes (Pitfall 4: step count drift)
+    skipsPattern.tracks[0].stepCount = stepCount
+    skipsPattern.tracks[0].beats = rebuildBeats(stepCount, skipsPattern.tracks[0].beats)
   }
 
   function onNumeratorInput(e: Event) {
@@ -112,6 +138,7 @@
     const val = parseInt((e.target as HTMLSelectElement).value, 10)
     if (!isNaN(val)) {
       pattern.tracks[0].denominator = val
+      skipsPattern.tracks[0].denominator = val
     }
     onTimeSigChange()
   }
@@ -121,6 +148,10 @@
     const stepCount = numerator * SUBDIV_MULT[subdiv]
     pattern.tracks[0].stepCount = stepCount
     pattern.tracks[0].beats = rebuildBeats(stepCount, pattern.tracks[0].beats)
+    // Keep skipsPattern in sync with subdivision changes (Pitfall 4: step count drift)
+    skipsPattern.tracks[0].subdivision = subdiv
+    skipsPattern.tracks[0].stepCount = stepCount
+    skipsPattern.tracks[0].beats = rebuildBeats(stepCount, skipsPattern.tracks[0].beats)
   }
 
   // --- Accent helpers ---
@@ -138,6 +169,35 @@
     // Cycle voice 0 (Normal) → 1 (Accent) → 2 (Silent) → 3 (Ghost) → 0.
     // Direct property mutation on Svelte 5 $state proxy triggers $effect → engine.updatePattern().
     pattern.tracks[0].beats[i].voice = (pattern.tracks[0].beats[i].voice + 1) % 4
+  }
+
+  // --- Training mode helpers ---
+
+  function onNormalBarCountInput(e: Event) {
+    const input = e.target as HTMLInputElement
+    const val = parseInt(input.value, 10)
+    if (!isNaN(val)) {
+      normalBarCount = Math.max(1, Math.min(32, val))
+    }
+    input.value = String(normalBarCount)
+  }
+
+  function onAltBarCountInput(e: Event) {
+    const input = e.target as HTMLInputElement
+    const val = parseInt(input.value, 10)
+    if (!isNaN(val)) {
+      altBarCount = Math.max(1, Math.min(32, val))
+    }
+    input.value = String(altBarCount)
+  }
+
+  function onAltTypeChange(type: 'silent' | 'skips') {
+    altType = type
+  }
+
+  function cycleSkipsBeatVoice(i: number) {
+    // Same voice cycle as cycleBeatVoice but mutates skipsPattern independently.
+    skipsPattern.tracks[0].beats[i].voice = (skipsPattern.tracks[0].beats[i].voice + 1) % 4
   }
 
   // --- Noise helpers ---
