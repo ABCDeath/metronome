@@ -292,13 +292,30 @@ export class AudioEngine {
     const lookahead = 0.1; // 100ms lookahead window (D-07)
 
     while (this._nextBeatTime < this._audioCtx.currentTime + lookahead) {
+      // Bar-boundary detection: fires at the start of each bar (D-04, D-07)
+      if (this._trainingEnabled && this._barStep % this._stepCount === 0) {
+        this._currentBarType = computeBarType(this._barCount, this._normalBarCount, this._altBarCount, this._altType);
+        this._onBarTypeChange?.(this._currentBarType, this._barCount);
+        this._barCount++;
+      }
+
       const beatSampleAbs = this._nextBeatTime * sampleRate;
       const quantumIndex  = Math.floor(beatSampleAbs / 128);
       const sampleOffset  = Math.min(Math.round(beatSampleAbs % 128), 127); // clamp to 0–127
 
-      // Compute step index and voice for this beat (D-09)
+      // Compute step index for this beat (D-09)
       const stepIndex = this._barStep % this._stepCount;
-      const voice     = this._beats[stepIndex]?.voice ?? 0;
+
+      // Silent-bar suppression: skip ring write for silent bars (D-05)
+      if (this._trainingEnabled && this._currentBarType === 'silent') {
+        this._nextBeatTime += this._stepInterval;
+        this._barStep++;
+        continue;
+      }
+
+      // Bar-type-aware voice selection: use _altBeats for skips bars (D-06)
+      const beats = (this._trainingEnabled && this._currentBarType === 'skips') ? this._altBeats : this._beats;
+      const voice = beats[stepIndex]?.voice ?? 0;
 
       // Pack u32 event (D-04):
       //   bits  0–6:  sampleOffset (0–127)
