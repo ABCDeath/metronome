@@ -13,6 +13,7 @@
 
 - [x] **PATTERN-01**: Each beat position in the pattern has an independently assignable click sound
 - [x] **PATTERN-02**: Beat 1 defaults to an accent sound; all other positions default to a normal click sound
+- [ ] **PATTERN-03**: Training mode with configurable cycle of normal, silent, and skips bars for timing-feel practice
 
 ### Audio
 
@@ -61,6 +62,7 @@
 | TIMING-04 | Phase 2 |
 | PATTERN-01 | Phase 4 |
 | PATTERN-02 | Phase 3 |
+| PATTERN-03 | Phase 6 |
 | AUDIO-01 | Phase 2 |
 | AUDIO-02 | Phase 4 |
 | AUDIO-03 | Phase 1 |

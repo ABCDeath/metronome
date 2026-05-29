@@ -18,6 +18,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 3: Timing Controls** - BPM, time signature, and subdivision controls connected to PatternState; beat 1 accent; user hears the correct pattern (completed 2026-05-20)
 - [ ] **Phase 4: Per-Beat Patterns and White Noise** - Per-beat sound assignment UI; white noise mix slider; user can customize every beat position
 - [ ] **Phase 5: Cross-Platform Validation** - Android Chrome hardware testing, macOS Safari verification, timing budget audit; v1 ships
+- [ ] **Phase 6: Training Mode** - Cycle of normal, silent, and skips bars for timing-feel practice; user configures bar counts and the skips-bar beat pattern independently
 
 ## Phase Details
 
@@ -156,10 +157,42 @@ Plans:
 
 - [ ] 05-02-PLAN.md — Android hardware validation: manual checklist, Cloudflare Pages deploy, USB remote debug Performance audit
 
+### Phase 6: Training Mode
+
+**Goal:** The user can activate a training mode where the metronome cycles through a configurable sequence of bar types — normal (full clicks), silent (no clicks), and skips (a separate beat pattern) — to practice internal time-keeping without constant auditory feedback.
+**Mode:** mvp
+**Depends on:** Phase 4 (per-beat pattern model must be in place)
+**Requirements:** PATTERN-03 (new)
+**Success Criteria** (what must be TRUE):
+
+  1. A training mode toggle is available in the UI; enabling it reveals controls for bar-type configuration without interrupting playback.
+  2. User can set how many consecutive normal bars and how many consecutive silent/skips bars appear in each cycle (minimum 1 each, maximum 32 each); the metronome cycles this pattern indefinitely while playing.
+  3. Silent bars produce no clicks; all beat voices are muted for the full bar duration and resume on the next normal bar.
+  4. The skips bar type has its own independent beat-pattern configuration (accent/normal/ghost/silent per beat position), editable separately from the main normal-bar pattern.
+  5. A visual indicator (e.g., bar-type label or color change on the beat grid) shows which bar type is currently active so the user knows where they are in the cycle.
+  6. Disabling training mode immediately restores continuous normal-bar playback without restarting the AudioContext.
+
+**Plans:** 3 plans
+
+Plans:
+**Wave 0** *(test infrastructure gate)*
+
+- [ ] 06-01-PLAN.md — TDD: Extract computeBarType pure function + unit tests
+
+**Wave 1** *(blocked on Wave 0 completion)*
+
+- [ ] 06-02-PLAN.md — AudioEngine training state, new API methods, bar-boundary detection in _schedulerTick
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [ ] 06-03-PLAN.md — Svelte UI: Training section toggle, bar count inputs, alt type selector, skips beat grid, cycle-strip indicator + human verify
+
+**UI hint:** yes
+
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
+Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
@@ -168,3 +201,4 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 | 3. Timing Controls | 4/4 | Complete | 2026-05-20 |
 | 4. Per-Beat Patterns and White Noise | 1/4 | In Progress|  |
 | 5. Cross-Platform Validation | 1/2 | In Progress|  |
+| 6. Training Mode | 0/3 | Planned |  |
