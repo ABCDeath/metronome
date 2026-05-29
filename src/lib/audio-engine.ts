@@ -52,9 +52,23 @@ export class AudioEngine {
   private _stepCount: number = 4;
   private _barStep: number = 0;
 
-  constructor(onStateChange?: (state: AudioEngineState) => void) {
+  // Training-mode state (D-03)
+  private _trainingEnabled: boolean = false;
+  private _normalBarCount: number = 2;
+  private _altBarCount: number = 2;
+  private _altType: 'silent' | 'skips' = 'silent';
+  private _altBeats: BeatPosition[] = [];
+  private _barCount: number = 0;
+  private _currentBarType: BarType = 'normal';
+  private _onBarTypeChange: ((type: BarType, barIndex: number) => void) | null;
+
+  constructor(
+    onStateChange?: (state: AudioEngineState) => void,
+    onBarTypeChange?: (type: BarType, barIndex: number) => void,
+  ) {
     // AudioContext is NOT created here — only in start() via user gesture (D-12).
     this._onStateChange = onStateChange ?? null;
+    this._onBarTypeChange = onBarTypeChange ?? null;
   }
 
   get state(): AudioEngineState {
@@ -173,6 +187,9 @@ export class AudioEngine {
     }
     // Reset bar position so playback restarts from beat 0 (D-09)
     this._barStep = 0;
+    // Reset training-mode counters on stop (D-08)
+    this._barCount = 0;
+    this._currentBarType = 'normal';
 
     if (this._audioCtx) {
       await this._audioCtx.suspend();
@@ -236,6 +253,36 @@ export class AudioEngine {
     if (this._paramBuffer) {
       Atomics.store(this._paramBuffer, 4, millis);
     }
+  }
+
+  /**
+   * Enable or disable training mode (D-12).
+   * When disabled, resets _currentBarType to 'normal' to prevent stale silent state (Pitfall 3).
+   */
+  setTrainingMode(enabled: boolean): void {
+    this._trainingEnabled = enabled;
+    if (!enabled) {
+      this._currentBarType = 'normal';
+    }
+  }
+
+  /**
+   * Configure the training mode cycle (D-13).
+   * normalBars and altBars are clamped to 1–32 (T-06-02).
+   * Safe to call while running — takes effect at the next bar boundary.
+   */
+  setTrainingConfig(normalBars: number, altBars: number, altType: 'silent' | 'skips'): void {
+    this._normalBarCount = Math.max(1, Math.min(32, normalBars));
+    this._altBarCount    = Math.max(1, Math.min(32, altBars));
+    this._altType        = altType;
+  }
+
+  /**
+   * Update the skips bar beat array (D-14).
+   * Safe to call while running — takes effect on the next skips bar.
+   */
+  setAltBeats(beats: BeatPosition[]): void {
+    this._altBeats = beats;
   }
 
   private _schedulerTick(): void {
