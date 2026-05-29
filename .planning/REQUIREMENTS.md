@@ -13,7 +13,7 @@
 
 - [x] **PATTERN-01**: Each beat position in the pattern has an independently assignable click sound
 - [x] **PATTERN-02**: Beat 1 defaults to an accent sound; all other positions default to a normal click sound
-- [ ] **PATTERN-03**: Training mode with configurable cycle of normal, silent, and skips bars for timing-feel practice
+- [x] **PATTERN-03**: Training mode with configurable cycle of normal, silent, and skips bars for timing-feel practice
 
 ### Audio
 

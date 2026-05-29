@@ -172,12 +172,12 @@ Plans:
   5. A visual indicator (e.g., bar-type label or color change on the beat grid) shows which bar type is currently active so the user knows where they are in the cycle.
   6. Disabling training mode immediately restores continuous normal-bar playback without restarting the AudioContext.
 
-**Plans:** 3 plans
+**Plans:** 1/3 plans executed
 
 Plans:
 **Wave 0** *(test infrastructure gate)*
 
-- [ ] 06-01-PLAN.md — TDD: Extract computeBarType pure function + unit tests
+- [x] 06-01-PLAN.md — TDD: Extract computeBarType pure function + unit tests
 
 **Wave 1** *(blocked on Wave 0 completion)*
 
@@ -201,4 +201,4 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6
 | 3. Timing Controls | 4/4 | Complete | 2026-05-20 |
 | 4. Per-Beat Patterns and White Noise | 1/4 | In Progress|  |
 | 5. Cross-Platform Validation | 1/2 | In Progress|  |
-| 6. Training Mode | 0/3 | Planned |  |
+| 6. Training Mode | 1/3 | In Progress|  |
