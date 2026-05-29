@@ -6,6 +6,32 @@
 import type { PatternState, BeatPosition, Subdivision } from './pattern.js';
 import { SUBDIV_MULT } from './pattern.js';
 
+// ---------------------------------------------------------------------------
+// Training-mode cycle computation (D-04)
+// ---------------------------------------------------------------------------
+
+export type BarType = 'normal' | 'silent' | 'skips';
+
+/**
+ * Determines whether a given bar falls in the normal or alternate (silent/skips)
+ * portion of a repeating cycle.
+ *
+ * @param barCount   - Zero-based monotonic bar counter maintained by the scheduler
+ * @param normalBars - Number of bars in the normal (audible) portion of each cycle
+ * @param altBars    - Number of bars in the alternate (silent or skipping) portion
+ * @param altType    - What to return for bars in the alternate range
+ * @returns 'normal' | 'silent' | 'skips'
+ */
+export function computeBarType(
+  barCount: number,
+  normalBars: number,
+  altBars: number,
+  altType: 'silent' | 'skips',
+): BarType {
+  const cyclePos = barCount % (normalBars + altBars);
+  return cyclePos < normalBars ? 'normal' : altType;
+}
+
 type AudioEngineState = 'stopped' | 'running';
 
 export class AudioEngine {
