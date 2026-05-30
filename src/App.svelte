@@ -7,6 +7,9 @@
   // AudioEngine instance created at component init — does NOT create AudioContext.
   // AudioContext is only created inside engine.start() on user gesture (D-12).
   let engineState = $state<'stopped' | 'running'>('stopped')
+  let currentStep = $state(-1)
+  let accentOpen = $state(false)
+  let theme = $state<'light' | 'dark' | 'system'>('system')
 
   // Training mode state — declared BEFORE engine construction (Pitfall 6: closure timing)
   let trainingEnabled = $state(false)
@@ -19,7 +22,8 @@
 
   const engine = new AudioEngine(
     (state) => { engineState = state },
-    (type, barIndex) => { currentBarType = type; currentBarIndex = barIndex }
+    (type, barIndex) => { currentBarType = type; currentBarIndex = barIndex },
+    (step) => { currentStep = step }
   )
 
   // PatternState: full timing + accent state, drives engine via $effect (D-06).
@@ -58,6 +62,15 @@
   // $effect: recomputes accent params whenever toggles or amp value change.
   $effect(() => {
     updateAccentParams()
+  })
+
+  // $effect: sync theme with document data-theme attribute.
+  $effect(() => {
+    if (theme === 'system') {
+      document.documentElement.removeAttribute('data-theme')
+    } else {
+      document.documentElement.setAttribute('data-theme', theme)
+    }
   })
 
   // $effect: sync training mode enable/disable with engine.
@@ -200,6 +213,13 @@
     skipsPattern.tracks[0].beats[i].voice = (skipsPattern.tracks[0].beats[i].voice + 1) % 4
   }
 
+  // --- Theme helpers ---
+
+  function cycleTheme() {
+    const order = ['system', 'light', 'dark'] as const
+    theme = order[(order.indexOf(theme) + 1) % 3]
+  }
+
   // --- Noise helpers ---
 
   function onNoiseInput(e: Event) {
@@ -211,11 +231,15 @@
 <svelte:window onkeydown={handleKeydown} />
 
 <main>
-  <h1>Metronome</h1>
-  <button id="play-btn" type="button" onclick={handlePlayStop}>
+  <div class="app-header">
+    <h1>Metronome</h1>
+    <button type="button" class="theme-btn" onclick={cycleTheme} title="Switch theme: {theme}">
+      {theme === 'light' ? '◯' : theme === 'dark' ? '●' : '◑'}
+    </button>
+  </div>
+  <button id="play-btn" class={engineState === 'running' ? 'playing' : ''} type="button" onclick={handlePlayStop}>
     {engineState === 'running' ? 'Stop' : 'Play'}
   </button>
-  <p class="status">Status: {engineState}</p>
 
   <div class="controls-container">
 
@@ -318,6 +342,14 @@
     <!-- Pattern Section -->
     <div class="section">
       <h2>Pattern</h2>
+      {#if engineState === 'running'}
+        <div class="beat-indicator" aria-hidden="true">
+          {#each Array.from({length: numerator}, (_, i) => i) as i}
+            {@const isActive = currentStep >= 0 && Math.floor(currentStep / subdivPerBeat) === i}
+            <span class="beat-dot {isActive ? 'beat-dot-active' : ''}"></span>
+          {/each}
+        </div>
+      {/if}
       {#if subdivPerBeat === 1}
         <!-- Single-row layout for quarter notes -->
         <div class="beat-grid" role="group" aria-label="Beat pattern">
@@ -362,10 +394,8 @@
 
     <!-- Training Section -->
     <div class="section">
-      <h2>Training</h2>
-      <!-- Toggle row -->
-      <div class="accent-row">
-        <span class="accent-label">Training mode</span>
+      <div class="section-header">
+        <h2>Training</h2>
         <input
           type="checkbox"
           class="toggle"
@@ -417,7 +447,15 @@
 
         {#if altType === 'skips'}
           <div style="margin-top: 12px;">
-            <p style="margin: 0 0 8px; font-size: 14px; color: #666;">Skips pattern</p>
+            <p style="margin: 0 0 8px; font-size: 14px; color: var(--fg-dim);">Skips pattern</p>
+            {#if engineState === 'running'}
+              <div class="beat-indicator" aria-hidden="true">
+                {#each Array.from({length: numerator}, (_, i) => i) as i}
+                  {@const isActive = currentStep >= 0 && Math.floor(currentStep / skipsSubdivPerBeat) === i}
+                  <span class="beat-dot {isActive ? 'beat-dot-active' : ''}"></span>
+                {/each}
+              </div>
+            {/if}
             {#if skipsSubdivPerBeat === 1}
               <!-- Single-row layout for quarter notes -->
               <div class="beat-grid" role="group" aria-label="Skips beat pattern">
@@ -475,7 +513,13 @@
 
     <!-- Accent Section -->
     <div class="section">
-      <h2>Accent</h2>
+      <div class="section-header">
+        <h2>Accent</h2>
+        <button type="button" class="collapse-btn" onclick={() => accentOpen = !accentOpen}>
+          {accentOpen ? '▲' : '▼'}
+        </button>
+      </div>
+      {#if accentOpen}
       <!-- Row 1: Pitch toggle -->
       <div class="accent-row">
         <span class="accent-label">Pitch (1400 Hz)</span>
@@ -507,6 +551,7 @@
           onchange={() => { accentAmpOn = !accentAmpOn }}
         />
       </div>
+      {/if}
     </div>
 
     <!-- Noise Section -->
@@ -538,6 +583,15 @@
     min-height: 100vh;
     gap: 1rem;
     font-family: system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--fg);
+  }
+
+  /* App header: title + theme button */
+  .app-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
   }
 
   h1 {
@@ -545,23 +599,52 @@
     margin: 0;
   }
 
+  .theme-btn {
+    background: none;
+    border: 2px solid var(--border-light);
+    border-radius: 50%;
+    width: 32px;
+    height: 32px;
+    cursor: pointer;
+    font-size: 14px;
+    color: var(--fg-dim);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    transition: border-color 0.2s;
+  }
+
+  .theme-btn:hover {
+    border-color: var(--border);
+    color: var(--fg);
+  }
+
+  /* Play/Stop button */
   #play-btn {
     font-size: 1.25rem;
     padding: 0.75rem 2rem;
     min-height: 44px;
     cursor: pointer;
     border-radius: 6px;
-    border: 2px solid #333;
-    background: #fff;
+    border: 2px solid var(--border);
+    background: var(--play-bg);
+    color: var(--play-fg);
+    transition: background 0.15s, color 0.15s;
   }
 
-  #play-btn:hover {
-    background: #f0f0f0;
+  #play-btn:hover:not(.playing) {
+    background: var(--hover-bg);
   }
 
-  .status {
-    color: #666;
-    font-size: 0.9rem;
+  #play-btn.playing {
+    background: var(--play-active-bg);
+    color: var(--play-active-fg);
+    border-color: var(--play-active-bg);
+  }
+
+  #play-btn.playing:hover {
+    opacity: 0.85;
   }
 
   /* Controls container */
@@ -582,6 +665,31 @@
     margin: 0 0 8px;
   }
 
+  /* Section header row (title + inline control) */
+  .section-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 8px;
+  }
+
+  .section-header h2 {
+    margin: 0;
+  }
+
+  .collapse-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 13px;
+    color: var(--fg-dim);
+    padding: 4px 8px;
+  }
+
+  .collapse-btn:hover {
+    color: var(--fg);
+  }
+
   /* Row layout */
   .row {
     display: flex;
@@ -599,13 +707,15 @@
     width: 64px;
     text-align: center;
     font-size: 16px;
-    border: 2px solid #ccc;
+    border: 2px solid var(--border-light);
     border-radius: 4px;
     padding: 4px;
+    background: var(--bg);
+    color: var(--fg);
   }
 
   .bpm-input:focus {
-    border-color: #333;
+    border-color: var(--border);
     outline: none;
   }
 
@@ -617,20 +727,21 @@
   .step-btn {
     min-height: 44px;
     padding: 8px 16px;
-    border: 2px solid #333;
+    border: 2px solid var(--border);
     border-radius: 6px;
-    background: #f0f0f0;
+    background: var(--hover-bg);
+    color: var(--fg);
     cursor: pointer;
     font-size: 16px;
   }
 
   .step-btn:hover {
-    background: #e0e0e0;
+    background: var(--hover-bg2);
   }
 
   .step-btn:active {
-    background: #333;
-    color: #fff;
+    background: var(--border);
+    color: var(--bg);
   }
 
   /* Time signature */
@@ -638,39 +749,43 @@
     width: 52px;
     text-align: center;
     font-size: 16px;
-    border: 2px solid #ccc;
+    border: 2px solid var(--border-light);
     border-radius: 4px;
     padding: 4px;
+    background: var(--bg);
+    color: var(--fg);
   }
 
   .num-input:focus {
-    border-color: #333;
+    border-color: var(--border);
     outline: none;
   }
 
   .sep {
     margin: 0 8px;
-    color: #333;
+    color: var(--fg);
     font-size: 16px;
   }
 
   .denom-select {
     width: 72px;
     font-size: 16px;
-    border: 2px solid #ccc;
+    border: 2px solid var(--border-light);
     border-radius: 4px;
     padding: 4px;
+    background: var(--bg);
+    color: var(--fg);
   }
 
   .denom-select:focus {
-    border-color: #333;
+    border-color: var(--border);
     outline: none;
   }
 
   /* Subdivision picker */
   .subdiv-group {
     display: flex;
-    border: 2px solid #333;
+    border: 2px solid var(--border);
     border-radius: 6px;
     overflow: hidden;
   }
@@ -679,9 +794,9 @@
     min-height: 44px;
     padding: 8px 16px;
     border: none;
-    border-right: 1px solid #333;
-    background: #fff;
-    color: #333;
+    border-right: 1px solid var(--border);
+    background: var(--bg);
+    color: var(--fg);
     cursor: pointer;
     font-size: 16px;
     flex: 1;
@@ -692,12 +807,12 @@
   }
 
   .subdiv-option.selected {
-    background: #333;
-    color: #fff;
+    background: var(--border);
+    color: var(--bg);
   }
 
   .subdiv-option:hover:not(.selected) {
-    background: #f0f0f0;
+    background: var(--hover-bg);
   }
 
   /* Accent panel */
@@ -734,7 +849,7 @@
     width: 36px;
     height: 20px;
     border-radius: 10px;
-    background: #ccc;
+    background: var(--inactive-bg);
     cursor: pointer;
     position: relative;
     transition: background 0.2s;
@@ -742,7 +857,7 @@
   }
 
   .toggle:checked {
-    background: #333;
+    background: var(--border);
   }
 
   .toggle::after {
@@ -751,7 +866,7 @@
     width: 16px;
     height: 16px;
     border-radius: 50%;
-    background: #fff;
+    background: var(--bg);
     top: 2px;
     left: 2px;
     transition: left 0.2s;
@@ -759,6 +874,25 @@
 
   .toggle:checked::after {
     left: 18px;
+  }
+
+  /* Beat indicator row */
+  .beat-indicator {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 6px;
+  }
+
+  .beat-dot {
+    min-width: 44px;
+    height: 6px;
+    border-radius: 3px;
+    background: var(--border-light);
+    transition: background 0.08s;
+  }
+
+  .beat-dot-active {
+    background: var(--border);
   }
 
   /* Beat grid — single row (quarter notes) */
@@ -785,55 +919,56 @@
     font-size: 14px;
     font-weight: 600;
     cursor: pointer;
-    border: 2px solid #333333;
+    border: 2px solid var(--border);
+    border-radius: 4px;
     display: flex;
     align-items: center;
     justify-content: center;
-    background: #ffffff;
-    color: #333333;
+    background: var(--bg);
+    color: var(--fg);
   }
 
   .beat-cell-normal {
-    background: #ffffff;
-    color: #333333;
-    border-color: #333333;
+    background: var(--bg);
+    color: var(--fg);
+    border-color: var(--border);
   }
 
   .beat-cell-normal:hover {
-    background: #f0f0f0;
+    background: var(--hover-bg);
   }
 
   .beat-cell-accent {
-    background: #333333;
-    color: #ffffff;
-    border-color: #333333;
+    background: var(--border);
+    color: var(--bg);
+    border-color: var(--border);
   }
 
   .beat-cell-accent:hover {
-    background: #555555;
+    background: var(--accent-hover);
   }
 
   .beat-cell-silent {
-    background: #f0f0f0;
-    color: #999999;
-    border-color: #cccccc;
+    background: var(--silent-bg);
+    color: var(--silent-fg);
+    border-color: var(--border-light);
   }
 
   .beat-cell-silent:hover {
-    background: #e0e0e0;
-    border-color: #aaaaaa;
+    background: var(--hover-bg2);
+    border-color: var(--ghost-border-hover);
   }
 
   .beat-cell-ghost {
-    background: #ffffff;
-    color: #aaaaaa;
-    border-color: #aaaaaa;
+    background: var(--bg);
+    color: var(--ghost-fg);
+    border-color: var(--ghost-fg);
     border-style: dashed;
   }
 
   .beat-cell-ghost:hover {
-    background: #f5f5f5;
-    border-color: #888888;
+    background: var(--ghost-hover-bg);
+    border-color: var(--ghost-border-hover);
   }
 
   /* Noise slider */
@@ -861,16 +996,16 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    border: 2px solid #ccc;
+    border: 2px solid var(--border-light);
     border-radius: 4px;
     font-size: 14px;
     font-weight: 600;
-    color: #666;
+    color: var(--fg-dim);
   }
 
   .cycle-block-active {
-    background: #333;
-    color: #fff;
-    border-color: #333;
+    background: var(--border);
+    color: var(--bg);
+    border-color: var(--border);
   }
 </style>

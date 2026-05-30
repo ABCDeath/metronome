@@ -48,7 +48,7 @@ export class AudioEngine {
   private _paramBuffer: Int32Array | null = null;          // Int32Array view over _paramSAB
   private _pendingNoiseGainMillis: number = 0;
   private _stepInterval: number = 60.0 / 120;             // seconds per step (recomputed by updatePattern)
-  private _beats: BeatPosition[] = [{ voice: 1 }, { voice: 0 }, { voice: 0 }, { voice: 0 }];
+  private _beats: BeatPosition[] = [{ voice: 0 }, { voice: 0 }, { voice: 0 }, { voice: 0 }];
   private _stepCount: number = 4;
   private _barStep: number = 0;
 
@@ -61,14 +61,17 @@ export class AudioEngine {
   private _barCount: number = 0;
   private _currentBarType: BarType = 'normal';
   private _onBarTypeChange: ((type: BarType, barIndex: number) => void) | null;
+  private _onBeatStep: ((step: number) => void) | null;
 
   constructor(
     onStateChange?: (state: AudioEngineState) => void,
     onBarTypeChange?: (type: BarType, barIndex: number) => void,
+    onBeatStep?: (step: number) => void,
   ) {
     // AudioContext is NOT created here — only in start() via user gesture (D-12).
     this._onStateChange = onStateChange ?? null;
     this._onBarTypeChange = onBarTypeChange ?? null;
+    this._onBeatStep = onBeatStep ?? null;
   }
 
   get state(): AudioEngineState {
@@ -197,6 +200,7 @@ export class AudioEngine {
 
     this._state = 'stopped';
     this._onStateChange?.(this._state);
+    this._onBeatStep?.(-1);
   }
 
   /**
@@ -305,6 +309,13 @@ export class AudioEngine {
 
       // Compute step index for this beat (D-09)
       const stepIndex = this._barStep % this._stepCount;
+
+      // Schedule visual beat indicator for every step, including silent bars
+      if (this._onBeatStep) {
+        const beatTime = this._nextBeatTime;
+        const now = this._audioCtx!.currentTime;
+        setTimeout(() => this._onBeatStep!(stepIndex), Math.max(0, (beatTime - now) * 1000));
+      }
 
       // Silent-bar suppression: skip ring write for silent bars (D-05)
       if (this._trainingEnabled && this._currentBarType === 'silent') {

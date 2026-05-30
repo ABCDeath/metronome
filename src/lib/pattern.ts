@@ -64,7 +64,7 @@ export function computeStepInterval(
  */
 export function rebuildBeats(stepCount: number, existingBeats?: BeatPosition[]): BeatPosition[] {
   if (!existingBeats) {
-    return Array.from({ length: stepCount }, (_, i) => ({ voice: i === 0 ? 1 : 0 }));
+    return Array.from({ length: stepCount }, () => ({ voice: 0 }));
   }
   return Array.from({ length: stepCount }, (_, i) => ({
     voice: i < existingBeats.length ? existingBeats[i].voice : 0,
@@ -83,7 +83,7 @@ export function defaultPatternState(): PatternState {
         stepCount: 4,
         subdivision: 'quarter',
         denominator: 4,
-        beats: [{ voice: 1 }, { voice: 0 }, { voice: 0 }, { voice: 0 }],
+        beats: [{ voice: 0 }, { voice: 0 }, { voice: 0 }, { voice: 0 }],
       },
     ],
     accentFreqHz: 1400,

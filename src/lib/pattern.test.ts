@@ -61,8 +61,8 @@ describe('rebuildBeats', () => {
     expect(rebuildBeats(4).length).toBe(4)
   })
 
-  it('first beat is accent (voice=1)', () => {
-    expect(rebuildBeats(4)[0].voice).toBe(1)
+  it('all beats are normal (voice=0) by default', () => {
+    expect(rebuildBeats(4)[0].voice).toBe(0)
   })
 
   it('remaining beats are normal (voice=0)', () => {
@@ -72,15 +72,14 @@ describe('rebuildBeats', () => {
     expect(beats[3].voice).toBe(0)
   })
 
-  it('single step: [0].voice === 1', () => {
-    expect(rebuildBeats(1)[0].voice).toBe(1)
+  it('single step: [0].voice === 0', () => {
+    expect(rebuildBeats(1)[0].voice).toBe(0)
   })
 
-  it('12 steps: length 12, only [0].voice === 1', () => {
+  it('12 steps: length 12, all voice === 0', () => {
     const beats = rebuildBeats(12)
     expect(beats.length).toBe(12)
-    expect(beats[0].voice).toBe(1)
-    for (let i = 1; i < 12; i++) {
+    for (let i = 0; i < 12; i++) {
       expect(beats[i].voice).toBe(0)
     }
   })
@@ -119,9 +118,9 @@ describe('rebuildBeats', () => {
       expect(result[3].voice).toBe(0)
     })
 
-    it('fresh init (no existingBeats) still returns Phase 3 default', () => {
+    it('fresh init (no existingBeats) returns all-normal beats', () => {
       const result = rebuildBeats(4)
-      expect(result[0].voice).toBe(1)
+      expect(result[0].voice).toBe(0)
       expect(result[1].voice).toBe(0)
       expect(result[3].voice).toBe(0)
     })
@@ -153,8 +152,8 @@ describe('defaultPatternState', () => {
     expect(defaultPatternState().tracks[0].denominator).toBe(4)
   })
 
-  it('first beat is accent (voice=1)', () => {
-    expect(defaultPatternState().tracks[0].beats[0].voice).toBe(1)
+  it('first beat is normal (voice=0)', () => {
+    expect(defaultPatternState().tracks[0].beats[0].voice).toBe(0)
   })
 
   it('second beat is normal (voice=0)', () => {

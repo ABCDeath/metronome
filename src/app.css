@@ -5,4 +5,97 @@
 body {
   margin: 0;
   padding: 0;
+  background: var(--bg);
+  color: var(--fg);
+  transition: background 0.2s, color 0.2s;
+}
+
+/* ---- Light theme (default) ---- */
+:root {
+  --bg: #ffffff;
+  --fg: #333333;
+  --fg-dim: #666666;
+  --border: #333333;
+  --border-light: #cccccc;
+  --hover-bg: #f0f0f0;
+  --hover-bg2: #e0e0e0;
+  --silent-bg: #f0f0f0;
+  --silent-fg: #999999;
+  --ghost-fg: #aaaaaa;
+  --ghost-border-hover: #888888;
+  --ghost-hover-bg: #f5f5f5;
+  --accent-hover: #555555;
+  --inactive-bg: #cccccc;
+  --play-bg: #ffffff;
+  --play-fg: #333333;
+  --play-active-bg: #333333;
+  --play-active-fg: #ffffff;
+}
+
+/* ---- System dark (no explicit theme set) ---- */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #1a1a1a;
+    --fg: #e0e0e0;
+    --fg-dim: #999999;
+    --border: #e0e0e0;
+    --border-light: #555555;
+    --hover-bg: #2a2a2a;
+    --hover-bg2: #3a3a3a;
+    --silent-bg: #2a2a2a;
+    --silent-fg: #666666;
+    --ghost-fg: #777777;
+    --ghost-border-hover: #aaaaaa;
+    --ghost-hover-bg: #252525;
+    --accent-hover: #cccccc;
+    --inactive-bg: #555555;
+    --play-bg: #1a1a1a;
+    --play-fg: #e0e0e0;
+    --play-active-bg: #e0e0e0;
+    --play-active-fg: #1a1a1a;
+  }
+}
+
+/* ---- Forced dark ---- */
+[data-theme="dark"] {
+  --bg: #1a1a1a;
+  --fg: #e0e0e0;
+  --fg-dim: #999999;
+  --border: #e0e0e0;
+  --border-light: #555555;
+  --hover-bg: #2a2a2a;
+  --hover-bg2: #3a3a3a;
+  --silent-bg: #2a2a2a;
+  --silent-fg: #666666;
+  --ghost-fg: #777777;
+  --ghost-border-hover: #aaaaaa;
+  --ghost-hover-bg: #252525;
+  --accent-hover: #cccccc;
+  --inactive-bg: #555555;
+  --play-bg: #1a1a1a;
+  --play-fg: #e0e0e0;
+  --play-active-bg: #e0e0e0;
+  --play-active-fg: #1a1a1a;
+}
+
+/* ---- Forced light ---- */
+[data-theme="light"] {
+  --bg: #ffffff;
+  --fg: #333333;
+  --fg-dim: #666666;
+  --border: #333333;
+  --border-light: #cccccc;
+  --hover-bg: #f0f0f0;
+  --hover-bg2: #e0e0e0;
+  --silent-bg: #f0f0f0;
+  --silent-fg: #999999;
+  --ghost-fg: #aaaaaa;
+  --ghost-border-hover: #888888;
+  --ghost-hover-bg: #f5f5f5;
+  --accent-hover: #555555;
+  --inactive-bg: #cccccc;
+  --play-bg: #ffffff;
+  --play-fg: #333333;
+  --play-active-bg: #333333;
+  --play-active-fg: #ffffff;
 }
