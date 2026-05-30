@@ -18,7 +18,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 3: Timing Controls** - BPM, time signature, and subdivision controls connected to PatternState; beat 1 accent; user hears the correct pattern (completed 2026-05-20)
 - [ ] **Phase 4: Per-Beat Patterns and White Noise** - Per-beat sound assignment UI; white noise mix slider; user can customize every beat position
 - [ ] **Phase 5: Cross-Platform Validation** - Android Chrome hardware testing, macOS Safari verification, timing budget audit; v1 ships
-- [ ] **Phase 6: Training Mode** - Cycle of normal, silent, and skips bars for timing-feel practice; user configures bar counts and the skips-bar beat pattern independently
+- [x] **Phase 6: Training Mode** - Cycle of normal, silent, and skips bars for timing-feel practice; user configures bar counts and the skips-bar beat pattern independently (completed 2026-05-30)
 
 ## Phase Details
 
@@ -172,7 +172,7 @@ Plans:
   5. A visual indicator (e.g., bar-type label or color change on the beat grid) shows which bar type is currently active so the user knows where they are in the cycle.
   6. Disabling training mode immediately restores continuous normal-bar playback without restarting the AudioContext.
 
-**Plans:** 2/3 plans executed
+**Plans:** 3/3 plans complete
 
 Plans:
 **Wave 0** *(test infrastructure gate)*
@@ -185,7 +185,7 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 06-03-PLAN.md — Svelte UI: Training section toggle, bar count inputs, alt type selector, skips beat grid, cycle-strip indicator + human verify
+- [x] 06-03-PLAN.md — Svelte UI: Training section toggle, bar count inputs, alt type selector, skips beat grid, cycle-strip indicator + human verify (COMPLETE 2026-05-30)
 
 **UI hint:** yes
 
@@ -201,4 +201,4 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6
 | 3. Timing Controls | 4/4 | Complete | 2026-05-20 |
 | 4. Per-Beat Patterns and White Noise | 1/4 | In Progress|  |
 | 5. Cross-Platform Validation | 1/2 | In Progress|  |
-| 6. Training Mode | 2/3 | In Progress|  |
+| 6. Training Mode | 3/3 | Complete | 2026-05-30 |
