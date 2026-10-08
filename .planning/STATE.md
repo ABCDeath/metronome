@@ -4,8 +4,8 @@ milestone: v1.0
 milestone_name: milestone
 status: complete
 stopped_at: Phase 06 complete — all 6 phases and 17 plans done (2026-05-30)
-last_updated: "2026-05-30T00:00:00.000Z"
-last_activity: 2026-05-30
+last_updated: "2026-10-08"
+last_activity: 2026-10-08
 progress:
   total_phases: 6
   completed_phases: 6
@@ -28,7 +28,7 @@ See: .planning/PROJECT.md (updated 2026-05-18)
 Phase: 06 (training-mode) — COMPLETE
 Plan: 3 of 3
 Status: All phases complete — v1.0 training mode shipped
-Last activity: 2026-05-30
+Last activity: 2026-10-08 - Fixed metronome silence after timestamp rollover
 
 Progress: [██████████] 100%
 
@@ -93,6 +93,7 @@ Recent decisions affecting current work:
 | Task | Date | Files Changed |
 |------|------|---------------|
 | Add ghost notes (voice=3, 30% amp) | 2026-05-22 | rust/src/lib.rs, src/App.svelte, public/wasm/ |
+| [Fix silence after timestamp rollover](./quick/261008-ix1-fix-metronome-silence-after-timestamp-ro/261008-ix1-SUMMARY.md) | 2026-10-08 | public/worklet/processor.js, src/lib/audio-engine.ts, src/lib/worklet-processor.test.ts |
 
 ### Pending Todos
 

@@ -331,7 +331,7 @@ export class AudioEngine {
       // Pack u32 event (D-04):
       //   bits  0–6:  sampleOffset (0–127)
       //   bits  7–11: voice (0=normal, 1=accent)
-      //   bits 12–31: quantumIndex (Strategy A — robust for Phase 3+ extensions)
+      //   bits 12–31: quantumIndex modulo 2^20 (worklet compares signed modular distance)
       const event = (sampleOffset & 0x7F) | ((voice & 0x1F) << 7) | ((quantumIndex & 0xFFFFF) << 12); // mask to 20 bits before shift (CR-02)
 
       // Write to SPSC ring — producer side (D-06: Atomics.store on write index)

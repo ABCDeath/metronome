@@ -99,18 +99,22 @@ class MetronomeProcessor extends AudioWorkletProcessor {
       const evOffset  =  event & 0x7F;                // bits 0–6: sample offset (0–127)
       const evVoice   = (event >> 7) & 0x1F;          // bits 7–11: voice type
       const evQuantum = (event >>> 12) & 0xFFFFF;     // bits 12–31: quantum index (unsigned shift, CR-02)
-      const myQuantum = (currentFrame / 128) | 0;     // (x | 0) = integer truncation, no alloc
+      const myQuantum = Math.floor(currentFrame / 128) & 0xFFFFF;
+      // The producer stores quantum indices modulo 2^20. Compare signed modular
+      // distance so rollover does not turn current/future beats into stale events.
+      // Events must be less than 2^19 quanta away (the scheduler looks ahead 100ms).
+      const quantumDelta = ((evQuantum - myQuantum + 0x80000) & 0xFFFFF) - 0x80000;
 
-      if (evQuantum === myQuantum) {
+      if (quantumDelta === 0) {
         // Event fires in the current quantum — consume it
         sampleOffset = evOffset;
         voice = evVoice;
         Atomics.store(this._ringIndices, 0, (readIdx + 1) & 0xFF);  // advance read index
-      } else if (evQuantum < myQuantum) {
+      } else if (quantumDelta < 0) {
         // Stale event — drain it (prevents ring from blocking on missed quanta)
         Atomics.store(this._ringIndices, 0, (readIdx + 1) & 0xFF);
       }
-      // evQuantum > myQuantum: leave in ring for a future quantum (do nothing)
+      // quantumDelta > 0: leave in ring for a future quantum (do nothing)
     }
 
     // Read noise gain from paramSAB slot 4 — fresh every frame (slider can change any time).
