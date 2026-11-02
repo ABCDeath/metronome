@@ -85,10 +85,10 @@
   $effect(() => { engine.setAltBeats(skipsPattern.tracks[0].beats) })
 
   function handleKeydown(e: KeyboardEvent) {
-    if (e.code === 'Space' && e.target === document.body) {
-      e.preventDefault()
-      handlePlayStop()
-    }
+    if (e.code !== 'Space') return
+    // Override native Space activation of whichever control still has focus.
+    e.preventDefault()
+    if (!e.repeat) handlePlayStop()
   }
 
   async function handlePlayStop() {

@@ -64,3 +64,43 @@ describe('playback error feedback', () => {
     expect(engine.state).toBe('stopped')
   })
 })
+
+describe('Space playback shortcut', () => {
+  const keyboardHandler = ast.statements.find((node): node is ts.FunctionDeclaration =>
+    ts.isFunctionDeclaration(node) && node.name?.text === 'handleKeydown',
+  )
+  if (!keyboardHandler) throw new Error('Keyboard handler was not found')
+  const keyboardScript = ts.transpileModule(keyboardHandler.getText(), {
+    compilerOptions: { target: ts.ScriptTarget.ESNext },
+  }).outputText
+
+  function pressKey(code: string, target: object, repeat = false) {
+    const event = { code, target, repeat, preventDefault: vi.fn() }
+    const handlePlayStop = vi.fn()
+    const context = createContext({ event, handlePlayStop })
+    runInContext(keyboardScript, context)
+    runInContext('handleKeydown(event)', context)
+    return { event, handlePlayStop }
+  }
+
+  it.each(['BODY', 'BUTTON', 'INPUT', 'SELECT'])(
+    'toggles playback and prevents native activation with focus on %s',
+    (tagName) => {
+      const { event, handlePlayStop } = pressKey('Space', { tagName })
+      expect(event.preventDefault).toHaveBeenCalledOnce()
+      expect(handlePlayStop).toHaveBeenCalledOnce()
+    },
+  )
+
+  it('prevents native activation without repeatedly toggling while Space is held', () => {
+    const { event, handlePlayStop } = pressKey('Space', { tagName: 'BUTTON' }, true)
+    expect(event.preventDefault).toHaveBeenCalledOnce()
+    expect(handlePlayStop).not.toHaveBeenCalled()
+  })
+
+  it('leaves other keys to the focused control', () => {
+    const { event, handlePlayStop } = pressKey('Enter', { tagName: 'BUTTON' })
+    expect(event.preventDefault).not.toHaveBeenCalled()
+    expect(handlePlayStop).not.toHaveBeenCalled()
+  })
+})
