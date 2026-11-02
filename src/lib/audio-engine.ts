@@ -4,7 +4,7 @@
 // D-11: SharedArrayBuffers pre-allocated once; zero allocations in the audio hot path.
 
 import type { PatternState, BeatPosition, Subdivision } from './pattern.js';
-import { SUBDIV_MULT } from './pattern.js';
+import { SUBDIV_MULT, computeStepInterval } from './pattern.js';
 
 // ---------------------------------------------------------------------------
 // Training-mode cycle computation (D-04)
@@ -32,7 +32,7 @@ export function computeBarType(
   return cyclePos < normalBars ? 'normal' : altType;
 }
 
-type AudioEngineState = 'stopped' | 'running';
+export type AudioEngineState = 'stopped' | 'starting' | 'running';
 
 export class AudioEngine {
   private _audioCtx: AudioContext | null = null;
@@ -40,6 +40,9 @@ export class AudioEngine {
   private _controlRingSAB: SharedArrayBuffer | null = null;
   private _paramSAB: SharedArrayBuffer | null = null;
   private _state: AudioEngineState = 'stopped';
+  private _startPromise: Promise<void> | null = null;
+  private _stopPromise: Promise<void> | null = null;
+  private _operationId = 0;
   private _onStateChange: ((state: AudioEngineState) => void) | null;
   private _schedulerIntervalId: ReturnType<typeof setInterval> | null = null;
   private _nextBeatTime: number = 0;
@@ -47,6 +50,7 @@ export class AudioEngine {
   private _controlRingData: Uint32Array | null = null;
   private _paramBuffer: Int32Array | null = null;          // Int32Array view over _paramSAB
   private _pendingNoiseGainMillis: number = 0;
+  private _pendingClickSound: number = 0;
   private _stepInterval: number = 60.0 / 120;             // seconds per step (recomputed by updatePattern)
   private _beats: BeatPosition[] = [{ voice: 0 }, { voice: 0 }, { voice: 0 }, { voice: 0 }];
   private _stepCount: number = 4;
@@ -79,10 +83,38 @@ export class AudioEngine {
   }
 
   async start(): Promise<void> {
-    // Idempotent — no-op if already running.
     if (this._state === 'running') {
       return;
     }
+    if (this._state === 'starting' && this._startPromise) {
+      return this._startPromise;
+    }
+
+    const operationId = ++this._operationId;
+    const previousStart = this._startPromise;
+    const previousStop = this._stopPromise;
+    this._state = 'starting';
+    this._onStateChange?.(this._state);
+    const pending = this._start(operationId, previousStart, previousStop);
+    this._startPromise = pending;
+    try {
+      await pending;
+    } catch (error) {
+      if (operationId === this._operationId) {
+        this._state = 'stopped';
+        this._onStateChange?.(this._state);
+      }
+      throw error;
+    } finally {
+      if (this._startPromise === pending) this._startPromise = null;
+    }
+  }
+
+  private async _start(
+    operationId: number,
+    previousStart: Promise<void> | null,
+    previousStop: Promise<void> | null,
+  ): Promise<void> {
 
     // Create AudioContext only on the first call to start() — satisfies user gesture gate (D-12).
     if (!this._audioCtx) {
@@ -95,20 +127,32 @@ export class AudioEngine {
       });
     }
 
+    // A quick Stop/Play must not race the previous initialization or suspension.
+    if (previousStart) await previousStart.catch(() => {});
+    if (previousStop) await previousStop;
+    if (operationId !== this._operationId) return;
+
     // Resume if the context was suspended (e.g., auto-suspended by browser autoplay policy).
     if (this._audioCtx.state === 'suspended') {
       await this._audioCtx.resume();
+    }
+    if (operationId !== this._operationId) {
+      // resume() may settle after Stop's suspend(); leave the context stopped.
+      await this._audioCtx.suspend();
+      return;
     }
 
     if (!this._workletNode) {
       // Fetch and compile WASM on the main thread (D-07).
       // Fetch is available on the main thread; AudioWorkletGlobalScope has no fetch.
       const response = await fetch('/wasm/metronome_engine_bg.wasm');
+      if (!response.ok) throw new Error(`Unable to load audio engine: HTTP ${response.status}`);
       const buffer = await response.arrayBuffer();
       const wasmModule = await WebAssembly.compile(buffer);
 
       // Load the AudioWorklet processor script (served from public/ as a static asset, D-03).
       await this._audioCtx.audioWorklet.addModule('/worklet/processor.js');
+      if (operationId !== this._operationId) return;
 
       // Allocate SharedArrayBuffers (D-11 — pre-allocated, never re-allocated).
       // controlRingSAB layout:
@@ -148,6 +192,7 @@ export class AudioEngine {
         controlRing: this._controlRingSAB,
         paramBuffer: this._paramSAB,
       });
+      this.setClickSound(this._pendingClickSound);
 
       // Listen for the "ready" message from the worklet (emitted after WASM instantiates).
       this._workletNode.port.onmessage = (event: MessageEvent) => {
@@ -175,8 +220,13 @@ export class AudioEngine {
   async stop(): Promise<void> {
     // Idempotent — no-op if already stopped.
     if (this._state === 'stopped') {
-      return;
+      return this._stopPromise ?? undefined;
     }
+
+    ++this._operationId;
+    this._state = 'stopped';
+    this._onStateChange?.(this._state);
+    this._onBeatStep?.(-1);
 
     // Cancel scheduler before suspending context (D-07 scheduler cleanup)
     if (this._schedulerIntervalId !== null) {
@@ -195,12 +245,14 @@ export class AudioEngine {
     this._currentBarType = 'normal';
 
     if (this._audioCtx) {
-      await this._audioCtx.suspend();
+      const pending = this._audioCtx.suspend();
+      this._stopPromise = pending;
+      try {
+        await pending;
+      } finally {
+        if (this._stopPromise === pending) this._stopPromise = null;
+      }
     }
-
-    this._state = 'stopped';
-    this._onStateChange?.(this._state);
-    this._onBeatStep?.(-1);
   }
 
   /**
@@ -212,7 +264,7 @@ export class AudioEngine {
   updatePattern(state: PatternState): void {
     const track = state.tracks[0];
     const mult = SUBDIV_MULT[track.subdivision as Subdivision] ?? 1;
-    const newInterval = (60.0 / state.bpm) * (4 / track.denominator) / mult;
+    const newInterval = computeStepInterval(state.bpm, track.denominator, mult);
     const newStepCount = track.stepCount;
 
     // Reset bar position when step count changes (Pitfall P3-02: stale barStep OOB)
@@ -247,6 +299,7 @@ export class AudioEngine {
   }
 
   setClickSound(sound: number): void {
+    this._pendingClickSound = sound;
     if (this._workletNode) {
       this._workletNode.port.postMessage({ type: 'set-click-sound', sound });
     }
@@ -314,7 +367,12 @@ export class AudioEngine {
       if (this._onBeatStep) {
         const beatTime = this._nextBeatTime;
         const now = this._audioCtx!.currentTime;
-        setTimeout(() => this._onBeatStep!(stepIndex), Math.max(0, (beatTime - now) * 1000));
+        const operationId = this._operationId;
+        setTimeout(() => {
+          if (this._state === 'running' && operationId === this._operationId) {
+            this._onBeatStep?.(stepIndex);
+          }
+        }, Math.max(0, (beatTime - now) * 1000));
       }
 
       // Silent-bar suppression: skip ring write for silent bars (D-05)

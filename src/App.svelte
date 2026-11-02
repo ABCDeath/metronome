@@ -1,12 +1,14 @@
 <script lang="ts">
   import { AudioEngine } from './lib/audio-engine.js'
-  import type { BarType } from './lib/audio-engine.js'
+  import type { AudioEngineState, BarType } from './lib/audio-engine.js'
   import type { PatternState, Subdivision } from './lib/pattern.js'
   import { SUBDIV_MULT, rebuildBeats, defaultPatternState } from './lib/pattern.js'
 
   // AudioEngine instance created at component init — does NOT create AudioContext.
   // AudioContext is only created inside engine.start() on user gesture (D-12).
-  let engineState = $state<'stopped' | 'running'>('stopped')
+  let engineState = $state<AudioEngineState>('stopped')
+  let audioError = $state('')
+  let playbackAction = 0
   let currentStep = $state(-1)
   let accentOpen = $state(false)
   let theme = $state<'light' | 'dark' | 'system'>('system')
@@ -90,15 +92,24 @@
   }
 
   async function handlePlayStop() {
-    if (engine.state === 'stopped') {
-      // This click handler IS the user gesture — AudioContext is created inside start() (D-12).
-      await engine.start()
-      // P3-04 safety: write accent params after SAB is initialized.
-      engine.updatePattern(pattern)
-      // Replay noise slider value — SAB is now ready (audio-engine also replays _pendingNoiseGainMillis).
-      engine.setNoiseGain(Math.round(noiseLevel * 0.25))
-    } else {
-      await engine.stop()
+    const action = ++playbackAction
+    const starting = engine.state === 'stopped'
+    audioError = ''
+    try {
+      if (starting) {
+        // This click handler IS the user gesture — AudioContext is created inside start() (D-12).
+        await engine.start()
+        // P3-04 safety: write accent params after SAB is initialized.
+        engine.updatePattern(pattern)
+        // Replay noise slider value — SAB is now ready (audio-engine also replays _pendingNoiseGainMillis).
+        engine.setNoiseGain(Math.round(noiseLevel * 0.25))
+      } else {
+        await engine.stop()
+      }
+    } catch {
+      if (action === playbackAction) {
+        audioError = `Unable to ${starting ? 'start' : 'stop'} audio. Please try again.`
+      }
     }
   }
 
@@ -158,13 +169,8 @@
 
   function onSubdivisionChange(subdiv: Subdivision) {
     pattern.tracks[0].subdivision = subdiv
-    const stepCount = numerator * SUBDIV_MULT[subdiv]
-    pattern.tracks[0].stepCount = stepCount
-    pattern.tracks[0].beats = rebuildBeats(stepCount, pattern.tracks[0].beats)
-    // Keep skipsPattern in sync with subdivision changes (Pitfall 4: step count drift)
     skipsPattern.tracks[0].subdivision = subdiv
-    skipsPattern.tracks[0].stepCount = stepCount
-    skipsPattern.tracks[0].beats = rebuildBeats(stepCount, skipsPattern.tracks[0].beats)
+    onTimeSigChange()
   }
 
   // --- Accent helpers ---
@@ -237,9 +243,13 @@
       {theme === 'light' ? '◯' : theme === 'dark' ? '●' : '◑'}
     </button>
   </div>
-  <button id="play-btn" class={engineState === 'running' ? 'playing' : ''} type="button" onclick={handlePlayStop}>
-    {engineState === 'running' ? 'Stop' : 'Play'}
+  <button id="play-btn" class={engineState !== 'stopped' ? 'playing' : ''} type="button" onclick={handlePlayStop}>
+    {engineState !== 'stopped' ? 'Stop' : 'Play'}
   </button>
+
+  {#if audioError}
+    <p role="alert">{audioError}</p>
+  {/if}
 
   <div class="controls-container">
 

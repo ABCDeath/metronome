@@ -14,6 +14,7 @@ class MetronomeProcessor extends AudioWorkletProcessor {
     this._ready = false;
     this._exports = null;
     this._outputView = null;
+    this._clickSound = 0;
 
     // Typed array views over SharedArrayBuffers — set when "init-buffers" message arrives.
     this._ringIndices = null;
@@ -28,6 +29,7 @@ class MetronomeProcessor extends AudioWorkletProcessor {
       // Pass the AudioContext sample rate to WASM for Phase 2 DSP use.
       // sampleRate is a global in AudioWorkletGlobalScope — do NOT pass via processorOptions.
       this._exports.init(sampleRate);
+      this._exports.set_click_sound(this._clickSound);
 
       // Prime accent params from paramSAB slots 2 and 3 (written by main thread before 'ready').
       // The 'init-buffers' message arrives before WASM instantiation completes, so _paramBuffer
@@ -69,9 +71,10 @@ class MetronomeProcessor extends AudioWorkletProcessor {
         // Main thread called updatePattern() — propagate new accent params to WASM.
         // event.data.freqHz: accent frequency in Hz; event.data.amp: amplitude multiplier (float).
         this._exports.set_accent_params(event.data.freqHz, event.data.amp);
-      } else if (event.data.type === 'set-click-sound' && this._exports) {
+      } else if (event.data.type === 'set-click-sound') {
         // User selected a new click sound. event.data.sound: 0=beep, 1=woodblock, 2=sticks.
-        this._exports.set_click_sound(event.data.sound);
+        this._clickSound = event.data.sound;
+        if (this._exports) this._exports.set_click_sound(this._clickSound);
       }
     };
   }

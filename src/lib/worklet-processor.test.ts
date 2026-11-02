@@ -13,6 +13,7 @@ type Processor = {
   port: {
     onmessage: (event: {
       data: { type: string; controlRing: SharedArrayBuffer; paramBuffer: SharedArrayBuffer }
+        | { type: 'set-click-sound'; sound: number }
     }) => void
   }
   process: (inputs: Float32Array[][], outputs: Float32Array[][]) => boolean
@@ -22,7 +23,7 @@ type ProcessorConstructor = new (options: {
   processorOptions: { wasmModule: null }
 }) => Processor
 
-async function createProcessor() {
+async function createProcessor(beforeReady?: (processor: Processor) => void) {
   const wasmMemory = new ArrayBuffer(128 * 4)
   const wasmOutput = new Float32Array(wasmMemory)
   // The renderer only marks triggers. Rust DSP has its own tests; this suite
@@ -32,6 +33,7 @@ async function createProcessor() {
     if (offset !== 0xFF) wasmOutput[offset] += voice + 1
   })
   const processors = new Map<string, ProcessorConstructor>()
+  const setClickSound = vi.fn()
   let signalReady!: () => void
   const ready = new Promise<void>((resolve) => { signalReady = resolve })
   const context = createContext({
@@ -53,6 +55,7 @@ async function createProcessor() {
         exports: {
           init: () => {},
           set_accent_params: () => {},
+          set_click_sound: setClickSound,
           get_output_buffer_ptr: () => 0,
           memory: { buffer: wasmMemory },
           fill_output_buffer: render,
@@ -70,11 +73,16 @@ async function createProcessor() {
   processor.port.onmessage({
     data: { type: 'init-buffers', controlRing, paramBuffer: new SharedArrayBuffer(32) },
   })
+  beforeReady?.(processor)
   await ready
 
   return {
     indices,
     render,
+    setClickSound,
+    setSound(sound: number) {
+      processor.port.onmessage({ data: { type: 'set-click-sound', sound } })
+    },
     enqueue(quantum: number, offset = 64, voice = 0) {
       const write = Atomics.load(indices, 1)
       const nextWrite = (write + 1) & 0xFF
@@ -91,6 +99,18 @@ async function createProcessor() {
     },
   }
 }
+
+describe('worklet sound selection', () => {
+  it('applies the latest selection received before WASM is ready', async () => {
+    const worklet = await createProcessor((processor) => {
+      processor.port.onmessage({ data: { type: 'set-click-sound', sound: 1 } })
+      processor.port.onmessage({ data: { type: 'set-click-sound', sound: 2 } })
+    })
+    expect(worklet.setClickSound).toHaveBeenCalledExactlyOnceWith(2)
+    worklet.setSound(1)
+    expect(worklet.setClickSound).toHaveBeenLastCalledWith(1)
+  })
+})
 
 describe('worklet beat timestamps', () => {
   it.each<[string, number]>([

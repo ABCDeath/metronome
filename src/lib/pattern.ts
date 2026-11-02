@@ -53,8 +53,7 @@ export function computeStepInterval(
 /**
  * Build a beats array of length stepCount.
  *
- * Without existingBeats: returns Phase 3 default — step 0 is the downbeat
- * (voice=1), all others are normal (voice=0).
+ * Without existingBeats: every step is Normal (voice=0).
  *
  * With existingBeats: merges existing voice assignments into the new length.
  * Positions within existingBeats.length copy the existing voice; positions

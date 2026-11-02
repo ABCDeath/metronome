@@ -10,7 +10,7 @@ static mut PHASE_INC: f32 = 0.0;        // set in init() = CLICK_FREQ / SAMPLE_R
 static mut ENVELOPE_GAIN: f32 = 0.0;    // current envelope amplitude
 static mut DECAY_COEFF: f32 = 0.0;      // set in init() = exp(-1 / decay_samples)
 static mut ACTIVE: bool = false;         // is the click envelope currently running?
-static mut ACCENT_FREQ: f32 = 1400.0;   // D-02: 1400 Hz accent vs 1000 Hz normal
+static mut ACCENT_FREQ: f32 = 1400.0;   // beep reference pitch; scaled to each sound's range
 static mut ACCENT_AMP: f32 = 1.3;       // D-03: default 1.3× multiplier (both toggles on)
 static mut PRNG_STATE: u32 = 12345;     // D-12: xorshift32 seed — must be non-zero
 static mut CLICK_SOUND: u32 = 0;        // 0=beep, 1=woodblock, 2=sticks
@@ -18,6 +18,7 @@ static mut DECAY_COEFF_WOOD: f32 = 0.0; // derived in init(): 7ms decay for wood
 static mut DECAY_COEFF_STICK: f32 = 0.0; // derived in init(): 5ms decay for sticks
 
 const CLICK_FREQ: f32 = 1000.0;         // D-01: 1000 Hz warm click
+const ACCENT_CLICK_FREQ: f32 = 1400.0;  // reference pitch when accent pitch is enabled
 const DECAY_MS: f32 = 12.0;             // D-02: 12ms (midpoint of 10–15ms range)
 const SILENCE_THRESHOLD: f32 = 1.0e-4;  // stop rendering when envelope falls below this
 const NO_BEAT_SENTINEL: u32 = 0xFF;     // sample_offset value meaning "no beat this quantum"
@@ -67,8 +68,8 @@ unsafe fn xorshift32_next() -> u32 {
 /// Called every AudioWorklet process() callback (128 samples per call).
 /// sample_offset: sample within this quantum where the click starts (0–127),
 ///                or NO_BEAT_SENTINEL (0xFF) if no beat fires this quantum.
-/// voice:         voice type (0=normal click, 1=accent click).
-/// _noise_gain:   white noise mix level (unused until Phase 3).
+/// voice:         voice type (0=normal, 1=accent, 2=silent, 3=ghost).
+/// noise_gain:    white noise mix level, applied even when no click is triggered.
 #[no_mangle]
 pub extern "C" fn fill_output_buffer(sample_offset: u32, voice: u32, noise_gain: f32) {
     // SAFETY: Single-threaded WASM; no concurrent mutation possible.
@@ -77,34 +78,6 @@ pub extern "C" fn fill_output_buffer(sample_offset: u32, voice: u32, noise_gain:
 
         // Read sound type once — used in both trigger and sample loop.
         let sound = std::ptr::addr_of!(CLICK_SOUND).read();
-
-        // Trigger: arm envelope if a beat fires this quantum (T-02-01: sentinel guards OOB).
-        if sample_offset != NO_BEAT_SENTINEL {
-            if voice == 2 {
-                // D-14: Silent voice — beat event fires (bar position advances) but no click
-                // synthesis. ACTIVE is not set. Noise mixing still runs unconditionally below.
-            } else {
-                let accent_freq = std::ptr::addr_of!(ACCENT_FREQ).read();
-                let accent_amp  = std::ptr::addr_of!(ACCENT_AMP).read();
-                // Always set PHASE_INC on every trigger (Pitfall P3-03: must restore normal freq).
-                // Freq and base amplitude depend on sound type and voice.
-                let (freq, base_amp) = match (sound, voice) {
-                    (0, 1) => (accent_freq,     accent_amp),        // beep accent
-                    (0, 3) => (CLICK_FREQ,       0.75_f32 * 0.3),  // beep ghost
-                    (0, _) => (CLICK_FREQ,       0.75_f32),         // beep normal
-                    (1, 1) => (WOOD_ACCENT_FREQ, accent_amp),       // woodblock accent
-                    (1, 3) => (WOOD_CLICK_FREQ,  0.85_f32 * 0.3),  // woodblock ghost
-                    (1, _) => (WOOD_CLICK_FREQ,  0.85_f32),         // woodblock normal
-                    (_, 1) => (STICK_CLICK_FREQ, accent_amp),       // sticks accent
-                    (_, 3) => (STICK_CLICK_FREQ, 0.85_f32 * 0.3),  // sticks ghost
-                    _      => (STICK_CLICK_FREQ, 0.85_f32),         // sticks normal
-                };
-                std::ptr::addr_of_mut!(PHASE_INC).write(freq / std::ptr::addr_of!(SAMPLE_RATE).read());
-                std::ptr::addr_of_mut!(ENVELOPE_GAIN).write(base_amp);
-                std::ptr::addr_of_mut!(PHASE_ACCUM).write(0.0_f32);
-                std::ptr::addr_of_mut!(ACTIVE).write(true);
-            }
-        }
 
         // Cache decay coefficient for this sound type outside the sample loop.
         let decay = match sound {
@@ -115,12 +88,40 @@ pub extern "C" fn fill_output_buffer(sample_offset: u32, voice: u32, noise_gain:
 
         // D-10: PRNG runs unconditionally every sample regardless of click activity or voice.
         for i in 0..128_usize {
+            // Keep rendering the previous click until this event's exact onset.
+            // Silent events do not retrigger or interrupt the existing envelope.
+            if sample_offset != NO_BEAT_SENTINEL && i == sample_offset as usize && voice != 2 {
+                let (normal_freq, accent_freq, normal_amp) = match sound {
+                    0 => (CLICK_FREQ, ACCENT_CLICK_FREQ, 0.75_f32),
+                    1 => (WOOD_CLICK_FREQ, WOOD_ACCENT_FREQ, 0.85_f32),
+                    _ => (STICK_CLICK_FREQ, STICK_CLICK_FREQ * 1.4, 0.85_f32),
+                };
+                let (freq, gain) = match voice {
+                    1 => {
+                        // 1000 Hz means pitch off; 1400 Hz selects each sound's
+                        // accent pitch while retaining the woodblock's 600/900 Hz character.
+                        let reference_freq = std::ptr::addr_of!(ACCENT_FREQ).read();
+                        let pitch_amount = (reference_freq - CLICK_FREQ)
+                            / (ACCENT_CLICK_FREQ - CLICK_FREQ);
+                        (
+                            normal_freq + (accent_freq - normal_freq) * pitch_amount,
+                            normal_amp * std::ptr::addr_of!(ACCENT_AMP).read(),
+                        )
+                    }
+                    3 => (normal_freq, normal_amp * 0.3),
+                    _ => (normal_freq, normal_amp),
+                };
+                std::ptr::addr_of_mut!(PHASE_INC)
+                    .write(freq / std::ptr::addr_of!(SAMPLE_RATE).read());
+                std::ptr::addr_of_mut!(ENVELOPE_GAIN).write(gain);
+                std::ptr::addr_of_mut!(PHASE_ACCUM).write(0.0);
+                std::ptr::addr_of_mut!(ACTIVE).write(true);
+            }
+
             let raw_noise = xorshift32_next();
             let noise_f = (raw_noise as i32 as f32) / 2147483648.0_f32;
 
-            let sample = if std::ptr::addr_of!(ACTIVE).read()
-                && (sample_offset == NO_BEAT_SENTINEL || i >= sample_offset as usize)
-            {
+            let sample = if std::ptr::addr_of!(ACTIVE).read() {
                 let phase = std::ptr::addr_of!(PHASE_ACCUM).read();
                 let gain  = std::ptr::addr_of!(ENVELOPE_GAIN).read();
 
@@ -185,7 +186,8 @@ pub extern "C" fn set_click_sound(sound: u32) {
 }
 
 /// Sets accent voice DSP parameters. Called by the AudioWorklet when accent settings change.
-/// freq_hz: click frequency for accent beats (default 1400.0 Hz).
+/// freq_hz: beep reference pitch (1000.0 = normal, default 1400.0 = accent).
+///          Other sounds map this reference to their own pitch range.
 /// amp:     amplitude multiplier for accent beats (default 1.3).
 #[no_mangle]
 pub extern "C" fn set_accent_params(freq_hz: f32, amp: f32) {
@@ -199,10 +201,120 @@ pub extern "C" fn set_accent_params(freq_hz: f32, amp: f32) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::sync::{Mutex, MutexGuard};
+
+    // The WASM renderer is single-threaded, but the native test harness is not.
+    // Hold this guard through each test's final read of the shared DSP state.
+    static DSP_TEST_LOCK: Mutex<()> = Mutex::new(());
+
+    fn lock_dsp() -> MutexGuard<'static, ()> {
+        let guard = DSP_TEST_LOCK.lock().expect("DSP test lock poisoned");
+        reset_dsp();
+        guard
+    }
+
+    // Caller must hold DSP_TEST_LOCK for the entire use of this state.
+    fn reset_dsp() {
+        unsafe {
+            std::ptr::addr_of_mut!(AUDIO_OUT).write([0.0; 128]);
+            std::ptr::addr_of_mut!(PHASE_ACCUM).write(0.0);
+            std::ptr::addr_of_mut!(ENVELOPE_GAIN).write(0.0);
+            std::ptr::addr_of_mut!(ACTIVE).write(false);
+            std::ptr::addr_of_mut!(PRNG_STATE).write(12345);
+        }
+        init(44100.0);
+        set_click_sound(0);
+        set_accent_params(1400.0, 1.3);
+    }
 
     // Helper: read AUDIO_OUT[i] via raw pointer (avoids &mut UB on static mut).
     unsafe fn read_out(i: usize) -> f32 {
         (std::ptr::addr_of!(AUDIO_OUT) as *const f32).add(i).read()
+    }
+
+    #[test]
+    fn new_beat_preserves_previous_click_until_its_sample_offset() {
+        let _guard = lock_dsp();
+        for sound in 0..3 {
+            for voice in 0..4 {
+                reset_dsp();
+                set_click_sound(sound);
+                fill_output_buffer(0, 0, 0.0);
+                fill_output_buffer(NO_BEAT_SENTINEL, 0, 0.0);
+                let continuation = unsafe { std::ptr::addr_of!(AUDIO_OUT).read() };
+
+                reset_dsp();
+                set_click_sound(sound);
+                fill_output_buffer(0, 0, 0.0);
+                fill_output_buffer(88, voice, 0.0);
+                let actual = unsafe { std::ptr::addr_of!(AUDIO_OUT).read() };
+                assert_eq!(
+                    &actual[..88],
+                    &continuation[..88],
+                    "sound {sound}, voice {voice}: next event must not erase the current tail"
+                );
+                if voice == 2 {
+                    assert_eq!(actual, continuation, "silent beats must not alter the tail");
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn accent_amplitude_is_a_multiplier_for_every_sound() {
+        let _guard = lock_dsp();
+        for sound in 0..3 {
+            reset_dsp();
+            set_click_sound(sound);
+            set_accent_params(1000.0, 1.0);
+            fill_output_buffer(0, 0, 0.0);
+            let normal = unsafe { std::ptr::addr_of!(AUDIO_OUT).read() };
+            let normal_gain = unsafe { std::ptr::addr_of!(ENVELOPE_GAIN).read() };
+
+            for multiplier in [1.0, 1.3] {
+                reset_dsp();
+                set_click_sound(sound);
+                set_accent_params(1000.0, multiplier);
+                fill_output_buffer(0, 1, 0.0);
+                let accent = unsafe { std::ptr::addr_of!(AUDIO_OUT).read() };
+                let accent_gain = unsafe { std::ptr::addr_of!(ENVELOPE_GAIN).read() };
+                assert!((accent_gain - normal_gain * multiplier).abs() < 1e-5);
+                for (normal_sample, accent_sample) in normal.iter().zip(accent.iter()) {
+                    let expected = normal_sample * multiplier;
+                    if expected.abs() < 1.0 {
+                        assert!(
+                            (accent_sample - expected).abs() < 1e-5,
+                            "sound {sound}, multiplier {multiplier}: {accent_sample} != {expected}"
+                        );
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn accent_pitch_toggle_uses_each_sounds_frequency_range() {
+        let _guard = lock_dsp();
+        for (sound, normal_freq, accent_freq) in
+            [(0, 1000.0, 1400.0), (1, 600.0, 900.0), (2, 3000.0, 4200.0)]
+        {
+            reset_dsp();
+            set_click_sound(sound);
+            fill_output_buffer(0, 0, 0.0);
+            let normal_inc = unsafe { std::ptr::addr_of!(PHASE_INC).read() };
+            assert!((normal_inc - normal_freq / 44100.0).abs() < 1e-6);
+
+            set_accent_params(1000.0, 1.0);
+            fill_output_buffer(0, 1, 0.0);
+            let pitch_off_inc = unsafe { std::ptr::addr_of!(PHASE_INC).read() };
+            assert_eq!(pitch_off_inc, normal_inc, "sound {sound}: pitch off");
+
+            set_accent_params(1400.0, 1.0);
+            fill_output_buffer(0, 1, 0.0);
+            let pitch_on_inc = unsafe { std::ptr::addr_of!(PHASE_INC).read() };
+            assert!((pitch_on_inc - accent_freq / 44100.0).abs() < 1e-6);
+            assert_ne!(pitch_on_inc, pitch_off_inc, "sound {sound}: pitch on");
+        }
     }
 
     // --- triangle wave boundary tests ---
@@ -249,6 +361,7 @@ mod tests {
 
     #[test]
     fn decay_coefficient_correctness() {
+        let _guard = lock_dsp();
         // At 44100Hz with DECAY_MS=12ms: decay_samples = 529.2
         // After decay_samples iterations, gain ≈ e^(-1) ≈ 0.368
         init(44100.0);
@@ -263,6 +376,7 @@ mod tests {
 
     #[test]
     fn decay_coefficient_48k() {
+        let _guard = lock_dsp();
         // At 48000Hz with DECAY_MS=12ms: decay_samples = 576.0
         // After 576 iterations, gain ≈ e^(-1) ≈ 0.368
         init(48000.0);
@@ -279,6 +393,7 @@ mod tests {
 
     #[test]
     fn sentinel_silence_inactive() {
+        let _guard = lock_dsp();
         // fill_output_buffer(0xFF, 0, 0.0) with ACTIVE=false → all 128 samples = 0.0
         unsafe {
             init(44100.0);
@@ -295,6 +410,7 @@ mod tests {
 
     #[test]
     fn trigger_produces_sound() {
+        let _guard = lock_dsp();
         // fill_output_buffer(0, 0, 0.0) → sample[0] is non-zero (envelope starts at 1.0)
         unsafe {
             init(44100.0);
@@ -307,6 +423,7 @@ mod tests {
 
     #[test]
     fn trigger_at_offset() {
+        let _guard = lock_dsp();
         // fill_output_buffer(64, 0, 0.0) → samples 0..63 are 0.0, sample[64] is non-zero
         unsafe {
             init(44100.0);
@@ -323,6 +440,7 @@ mod tests {
 
     #[test]
     fn envelope_crosses_quantum() {
+        let _guard = lock_dsp();
         // Trigger at offset 120, then call fill_output_buffer(0xFF, 0, 0.0) → early samples non-zero
         unsafe {
             init(44100.0);
@@ -347,6 +465,7 @@ mod tests {
 
     #[test]
     fn test_set_accent_params_roundtrip() {
+        let _guard = lock_dsp();
         // Call set_accent_params, verify ACCENT_FREQ and ACCENT_AMP are updated.
         unsafe {
             set_accent_params(1400.0, 1.3);
@@ -367,6 +486,7 @@ mod tests {
 
     #[test]
     fn test_accent_pitch_differs() {
+        let _guard = lock_dsp();
         // Verify PHASE_INC is set to 1400/SR for voice=1 and 1000/SR for voice=0.
         unsafe {
             init(44100.0);
@@ -393,6 +513,7 @@ mod tests {
 
     #[test]
     fn test_accent_amplitude_differs() {
+        let _guard = lock_dsp();
         // Verify peak amplitude is higher for voice=1 (amp=1.3) than voice=0 (amp=1.0).
         unsafe {
             init(44100.0);
@@ -419,6 +540,7 @@ mod tests {
 
     #[test]
     fn test_phase_inc_reset_on_normal() {
+        let _guard = lock_dsp();
         // Pitfall P3-03: after an accent trigger, a normal trigger must restore PHASE_INC
         // to CLICK_FREQ / SAMPLE_RATE, not leave it at the accent frequency.
         unsafe {
@@ -454,6 +576,7 @@ mod tests {
 
     #[test]
     fn test_silent_voice_no_click() {
+        let _guard = lock_dsp();
         // fill_output_buffer(0, 2, 0.0) with ACTIVE=false → all 128 samples are 0.0
         // Voice 2 = silent: no envelope triggered, no ACTIVE set. noise_gain=0.0 → no noise.
         unsafe {
@@ -470,6 +593,7 @@ mod tests {
 
     #[test]
     fn test_noise_produces_output() {
+        let _guard = lock_dsp();
         // fill_output_buffer(NO_BEAT_SENTINEL, 0, 1.0) with ACTIVE=false and deterministic PRNG
         // → at least one of the 128 output samples is non-zero.
         // Proves xorshift32 produces non-zero values at seed 12345 (Pitfall 2: zero seed = silence).
@@ -487,6 +611,7 @@ mod tests {
 
     #[test]
     fn test_noise_zero_gain() {
+        let _guard = lock_dsp();
         // fill_output_buffer(NO_BEAT_SENTINEL, 0, 0.0) with ACTIVE=false → all 128 samples = 0.0
         // When noise_gain is 0.0 and no click is active, IEEE 754 multiplication by 0.0 is
         // exactly 0.0 — confirming digital silence with no branch in the hot path (D-12).
@@ -504,6 +629,7 @@ mod tests {
 
     #[test]
     fn test_ghost_amplitude_lower_than_normal() {
+        let _guard = lock_dsp();
         // Ghost voice (voice=3) must produce lower peak amplitude than normal (voice=0).
         unsafe {
             init(44100.0);
@@ -531,6 +657,7 @@ mod tests {
 
     #[test]
     fn test_clamp_prevents_clipping() {
+        let _guard = lock_dsp();
         // fill_output_buffer(0, 1, 1.0) with ACTIVE=false — accent click (voice=1) + 100% noise.
         // Worst-case additive mix: peak click ~1.3 + peak noise ~1.0 = ~2.3 before clamp.
         // The per-sample clamp(-1.0, 1.0) must prevent any sample from exceeding [-1.0, 1.0].
